@@ -306,10 +306,9 @@ elif aba == "🤖 Agente IA":
 
     with col2:
         fornecedores_unicos = sorted(df_base["Fornecedor"].dropna().unique().tolist()) if "Fornecedor" in df_base.columns else []
-        filtro_fornecedor = st.multiselect(
+        filtro_fornecedor = st.selectbox(
             "Fornecedor",
-            fornecedores_unicos,
-            default=none
+            fornecedores_unicos
         )
 
     with col3:
