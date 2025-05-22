@@ -100,69 +100,70 @@ aba = st.sidebar.radio(
 # --------------------------
 # Aba 1 - Análise Tradicional
 # --------------------------
+from sklearn.cluster import KMeans
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.preprocessing import StandardScaler
+from sklearn.decomposition import PCA
+from sklearn.metrics import silhouette_score
+import matplotlib.pyplot as plt
+import plotly.express as px
+import numpy as np
+import pandas as pd
+
+
 if aba == "🏗️ Análise ML":
     st.header("🏗️ Clusterização + Classificação + Red Flag")
 
     uploaded_file = st.file_uploader("📤 Faça upload da base de pagamentos (Excel)", type=["xlsx"])
 
     if uploaded_file is not None:
-        df_raw = pd.read_excel(uploaded_file, engine='openpyxl')
-    
-        # ✅ Executa o pré-processamento
-        df, colunas_numericas = preprocessar_base(df_raw)
-    
-        if not colunas_numericas:
-            st.stop()  # Interrompe execução se não houver colunas numéricas
+        df = pd.read_excel(uploaded_file, engine='openpyxl')
 
         st.subheader("📄 Pré-visualização da base")
         st.dataframe(df.head())
 
-        st.subheader("🧠 Análise de Peso Inicial das Variáveis")
-
         # 🔧 Limpeza dos nomes das colunas
         df.columns = df.columns.str.strip()
-        
+
         # 🔍 Selecionar colunas numéricas
         colunas_numericas = df.select_dtypes(include=['float64', 'int64']).columns.tolist()
-        
+
         if not colunas_numericas:
             st.warning("⚠️ Nenhuma coluna numérica detectada inicialmente.")
             st.stop()
-        
+
         # 🔍 Verificar percentual de nulos e remover colunas com mais de 50% de nulos
         limite_nulos = 0.5  # 50%
         colunas_validas = [
             col for col in colunas_numericas
             if df[col].isnull().mean() < limite_nulos
         ]
-        
+
         if not colunas_validas:
             st.error("🚫 Nenhuma coluna válida encontrada após filtro de nulos (>50%).")
             st.stop()
-        
+
         st.info(f"✔️ Colunas válidas para análise: {colunas_validas}")
-        
+
         # 🔧 Preencher nulos temporariamente para calcular variância
         df_fill = df[colunas_validas].fillna(0)
-        
+
         # 🔧 Padronização dos dados
         scaler = StandardScaler()
         X_scaled = scaler.fit_transform(df_fill)
-        
+
         # 📊 Calcular variância padronizada
         variancias = np.var(X_scaled, axis=0)
         peso_colunas = variancias / variancias.sum()
-        
-        # 🔥 Construir DataFrame de pesos
+
         df_pesos = pd.DataFrame({
             'Feature': colunas_validas,
             'Peso (%)': peso_colunas * 100
         }).sort_values(by="Peso (%)", ascending=False)
-        
-        # 📑 Mostrar tabela
+
         st.subheader("📑 Tabela de Pesos das Variáveis")
         st.dataframe(df_pesos)
-        
+
         # 📈 Plotar gráfico interativo
         fig_pesos = px.bar(
             df_pesos,
@@ -172,6 +173,108 @@ if aba == "🏗️ Análise ML":
             text_auto='.2f'
         )
         st.plotly_chart(fig_pesos, use_container_width=True)
+
+        st.subheader("🎯 Selecione as colunas para clusterização e classificação")
+        selected_columns = st.multiselect(
+            "Selecione as colunas com maior relevância para o modelo",
+            colunas_validas,
+            default=df_pesos['Feature'].head(5).tolist()  # Sugere as top 5
+        )
+
+        if selected_columns:
+            st.success(f"Colunas selecionadas: {selected_columns}")
+
+            # 🔧 Padroniza novamente os dados selecionados
+            X_scaled = scaler.fit_transform(df[selected_columns].fillna(0))
+
+            # 🔍 Avaliação do melhor número de clusters
+            st.subheader("🔢 Avaliação Automática do Número de Clusters")
+
+            sil_scores = []
+            inertias = []
+            k_range = range(2, 10)
+
+            for k in k_range:
+                kmeans = KMeans(n_clusters=k, random_state=42, n_init=10)
+                kmeans.fit(X_scaled)
+                labels = kmeans.labels_
+                sil = silhouette_score(X_scaled, labels)
+                sil_scores.append(sil)
+                inertias.append(kmeans.inertia_)
+
+            # Plot Elbow + Silhouette
+            fig, ax1 = plt.subplots()
+
+            color = 'tab:blue'
+            ax1.set_xlabel('Número de Clusters')
+            ax1.set_ylabel('Inertia (Elbow)', color=color)
+            ax1.plot(k_range, inertias, marker='o', color=color)
+            ax1.tick_params(axis='y', labelcolor=color)
+
+            ax2 = ax1.twinx()
+
+            color = 'tab:green'
+            ax2.set_ylabel('Silhouette Score', color=color)
+            ax2.plot(k_range, sil_scores, marker='x', linestyle='--', color=color)
+            ax2.tick_params(axis='y', labelcolor=color)
+
+            st.pyplot(fig)
+
+            # 🏆 Melhor número de clusters
+            melhor_k = k_range[sil_scores.index(max(sil_scores))]
+            st.success(f"📈 Número sugerido de clusters: **{melhor_k}**")
+
+            k_selecionado = st.number_input(
+                "Ajuste manual do número de clusters (opcional)",
+                min_value=2,
+                max_value=10,
+                value=melhor_k,
+                step=1
+            )
+
+            # 🚀 Clusterização
+            kmeans = KMeans(n_clusters=k_selecionado, random_state=42, n_init=10)
+            clusters = kmeans.fit_predict(X_scaled)
+            df['Cluster'] = clusters
+
+            # 📊 PCA para visualização
+            st.subheader("📊 Visualização dos Clusters")
+            pca = PCA(n_components=2)
+            components = pca.fit_transform(X_scaled)
+            df_plot = pd.DataFrame(components, columns=['Componente 1', 'Componente 2'])
+            df_plot['Cluster'] = clusters.astype(str)
+
+            fig = px.scatter(
+                df_plot,
+                x="Componente 1",
+                y="Componente 2",
+                color="Cluster",
+                title="Distribuição dos Clusters",
+                width=800,
+                height=500
+            )
+            st.plotly_chart(fig, use_container_width=True)
+
+            # 🔥 Importância Real das Features com Random Forest
+            st.subheader("🛠️ Importância Real das Features")
+
+            rf = RandomForestClassifier(random_state=42)
+            rf.fit(X_scaled, clusters)
+
+            importances = rf.feature_importances_
+            feature_importance = pd.DataFrame({
+                'Feature': selected_columns,
+                'Importância': importances
+            }).sort_values(by="Importância", ascending=False)
+
+            fig_pesos = px.bar(
+                feature_importance,
+                x="Feature",
+                y="Importância",
+                title="Importância das Features (Random Forest)",
+                text_auto='.2f'
+            )
+            st.plotly_chart(fig_pesos, use_container_width=True)
 
             # 🚩 Classificação para Red Flag
             st.subheader("🚩 Classificação Supervisionada para Identificação de Red Flags")
@@ -184,6 +287,7 @@ if aba == "🏗️ Análise ML":
 
             df['Red Flag'] = df['Cluster'].apply(lambda x: 'Sim' if x in red_flag_cluster else 'Não')
 
+            st.subheader("📑 Pré-visualização da base final")
             st.dataframe(df.head())
 
             # ✔️ Salvar no session_state para a Aba 2
