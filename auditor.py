@@ -309,7 +309,7 @@ elif aba == "🤖 Agente IA":
         filtro_fornecedor = st.multiselect(
             "Fornecedor",
             fornecedores_unicos,
-            default=fornecedores_unicos
+            default=none
         )
 
     with col3:
