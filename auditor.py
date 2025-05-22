@@ -2,6 +2,9 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import plotly.express as px
+import openai
+import json
+import time
 
 # --------------------------
 # Configurações da página
@@ -14,6 +17,9 @@ st.set_page_config(
 
 st.title("💰 Análise Inteligente de Pagamentos")
 st.markdown("Aplicativo para clusterização, detecção de red flags e revisão inteligente com IA.")
+
+# Configurar chave da OpenAI
+openai.api_key = st.secrets["openai"]["api_key"]
 
 # --------------------------
 # Definindo abas
@@ -70,13 +76,13 @@ if aba == "🏗️ Análise ML":
             )
 
 # --------------------------
-# Aba 2 - Agente GPT-4o (Com Filtros e Estimativa de Custo)
+# Aba 2 - Agente GPT-4o com IA Real Robusto
 # --------------------------
 elif aba == "🤖 Agente IA":
     st.header("🤖 Agente de IA - Revisão dos Red Flags")
 
     if 'df_redflag' not in st.session_state:
-        st.warning("⚠️ A base de Red Flags ainda não foi gerada. Por favor, execute a Análise de ML antes de usar esta aba.")
+        st.warning("⚠️ A base de Red Flags ainda não foi gerada. Por favor, execute a Aba 1 antes de usar esta aba.")
         st.stop()
 
     df_base = st.session_state['df_redflag'].copy()
@@ -100,7 +106,7 @@ elif aba == "🤖 Agente IA":
         filtro_fornecedor = st.multiselect(
             "Fornecedor",
             fornecedores_unicos,
-            default=fornecedores_unicos  # Default seleciona todos
+            default=fornecedores_unicos
         )
 
     with col3:
@@ -138,34 +144,91 @@ elif aba == "🤖 Agente IA":
     st.subheader("💰 Estimativa de Custo")
 
     tokens_estimados_por_linha = 150  # Aproximação média
-    custo_por_1000_tokens = 0.01  # Custo aproximado GPT-4o (ajustar conforme seu plano)
+    custo_por_1000_tokens = 0.01  # Custo aproximado GPT-4o
 
     total_tokens = len(df_filtrado) * tokens_estimados_por_linha
     custo_estimado = (total_tokens / 1000) * custo_por_1000_tokens
 
     st.info(f"🔢 Tokens estimados: {total_tokens} tokens")
-    st.info(f"💰 Custo estimado: **USD {custo_estimado:.4f}** (baseado em {len(df_filtrado)} registros)")
+    st.info(f"💰 Custo estimado: **USD {custo_estimado:.4f}**")
 
-    # 🚀 Botão de Execução
     executar = st.button(f"🚀 Executar Agente GPT-4o para {len(df_filtrado)} registros")
 
     if executar:
-        st.info("🔧 O agente está analisando os dados... (Simulação)")
+        st.info("🔧 O agente está analisando os dados. Isso pode levar alguns minutos...")
 
-        df_final = df_filtrado.copy()
+        resultados = []
+        progresso = st.progress(0)
 
-        # 🔥 Simulação da análise do agente
-        df_final['Red Flag Revisado'] = np.random.choice(['Sim', 'Não'], size=len(df_final))
-        df_final['Motivo'] = np.where(
-            df_final['Red Flag Revisado'] == 'Sim',
-            'Pagamento fora do padrão esperado, verificado por IA.',
-            'Sem inconsistências relevantes encontradas.'
-        )
+        for idx, (i, row) in enumerate(df_filtrado.iterrows()):
+            try:
+                dados = row.dropna().to_dict()
+
+                prompt = f"""
+                Você é um auditor especialista em compliance e análise de pagamentos corporativos.
+
+                Analise o seguinte lançamento de pagamento extraído do SAP:
+
+                {dados}
+
+                Este lançamento foi previamente classificado como Red Flag = {row.get('Red Flag', 'Desconhecido')}.
+
+                Com base nas informações apresentadas, responda:
+                1. Se o Red Flag deve ser mantido ("Sim") ou removido ("Não").
+                2. O motivo da sua decisão, de forma objetiva, clara e técnica.
+
+                Responda no formato JSON:
+                {{
+                  "Red Flag Revisado": "Sim ou Não",
+                  "Motivo": "explicação detalhada"
+                }}
+                """
+
+                response = openai.ChatCompletion.create(
+                    model="gpt-4o",
+                    messages=[
+                        {"role": "user", "content": prompt}
+                    ],
+                    temperature=0
+                )
+
+                resposta = response.choices[0].message.content.strip()
+
+                try:
+                    resposta_json = json.loads(resposta)
+                    red_flag_revisado = resposta_json.get("Red Flag Revisado", "Não")
+                    motivo = resposta_json.get("Motivo", "Motivo não identificado.")
+                except json.JSONDecodeError:
+                    red_flag_revisado = "Não"
+                    motivo = f"Erro no parsing da resposta: {resposta}"
+
+                resultados.append({
+                    **dados,
+                    "Red Flag": row.get('Red Flag', ''),
+                    "Red Flag Revisado": red_flag_revisado,
+                    "Motivo": motivo
+                })
+
+                progresso.progress((idx + 1) / len(df_filtrado))
+
+                time.sleep(1)  # Delay opcional para evitar rate limit
+
+            except Exception as e:
+                st.error(f"Erro ao processar linha {i}: {e}")
+                resultados.append({
+                    **row.to_dict(),
+                    "Red Flag Revisado": "Erro",
+                    "Motivo": f"Erro na execução do agente: {e}"
+                })
+                continue
+
+        progresso.empty()
+
+        df_final = pd.DataFrame(resultados)
 
         st.success("✅ Análise do agente concluída.")
         st.dataframe(df_final.head())
 
-        # Salvar para download na Aba 3
         st.session_state['df_final'] = df_final
 
 # --------------------------
