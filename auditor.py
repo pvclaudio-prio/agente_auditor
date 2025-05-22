@@ -50,20 +50,56 @@ if aba == "🏗️ Análise ML":
         st.subheader("📄 Pré-visualização da base")
         st.dataframe(df.head())
 
-        st.subheader("🎯 Selecione as colunas numéricas para análise")
+        st.subheader("🧠 Análise de Peso Inicial das Variáveis")
+
+        # 🔍 Seleciona colunas numéricas automaticamente
+        colunas_numericas = df.select_dtypes(include=['float64', 'int64']).columns.tolist()
+
+        if not colunas_numericas:
+            st.error("⚠️ Nenhuma coluna numérica encontrada para análise.")
+            st.stop()
+
+        # 🔧 Padroniza os dados
+        scaler = StandardScaler()
+        X_scaled = scaler.fit_transform(df[colunas_numericas])
+
+        # 📊 Calcula a variância de cada coluna
+        variancias = np.var(X_scaled, axis=0)
+        peso_colunas = variancias / variancias.sum()
+
+        df_pesos = pd.DataFrame({
+            'Feature': colunas_numericas,
+            'Peso (%)': peso_colunas * 100
+        }).sort_values(by="Peso (%)", ascending=False)
+
+        st.dataframe(df_pesos)
+
+        # 📈 Gráfico das importâncias
+        fig_pesos = px.bar(
+            df_pesos,
+            x='Feature',
+            y='Peso (%)',
+            title="📊 Peso Estatístico Inicial das Variáveis",
+            text_auto='.2f'
+        )
+        st.plotly_chart(fig_pesos, use_container_width=True)
+
+        st.markdown("---")
+        st.subheader("🎯 Selecione as colunas para clusterização e classificação")
+
         selected_columns = st.multiselect(
-            "Selecione as colunas para clusterização e classificação",
-            df.select_dtypes(include=['float64', 'int64']).columns.tolist()
+            "Selecione as colunas com maior relevância para o modelo",
+            colunas_numericas,
+            default=df_pesos['Feature'].head(5).tolist()  # Sugere as top 5 como padrão
         )
 
         if selected_columns:
             st.success(f"Colunas selecionadas: {selected_columns}")
 
-            # 🔧 Padronização dos dados
-            scaler = StandardScaler()
+            # 🔧 Padronização novamente para apenas as selecionadas
             X_scaled = scaler.fit_transform(df[selected_columns])
 
-            # 🔍 Encontrar número ótimo de clusters (Elbow + Silhouette)
+            # 🔍 Avaliação do melhor número de clusters
             st.subheader("🔢 Avaliação Automática do Número de Clusters")
 
             sil_scores = []
@@ -78,7 +114,7 @@ if aba == "🏗️ Análise ML":
                 sil_scores.append(sil)
                 inertias.append(kmeans.inertia_)
 
-            # Plot Elbow e Silhouette
+            # Plot Elbow + Silhouette
             fig, ax1 = plt.subplots()
 
             color = 'tab:blue'
@@ -96,9 +132,9 @@ if aba == "🏗️ Análise ML":
 
             st.pyplot(fig)
 
-            # Seleção automática: melhor Silhouette
+            # 🏆 Melhor número de clusters
             melhor_k = k_range[sil_scores.index(max(sil_scores))]
-            st.success(f"📈 Número sugerido de clusters: **{melhor_k}** (Silhouette Score = {max(sil_scores):.4f})")
+            st.success(f"📈 Número sugerido de clusters: **{melhor_k}**")
 
             k_selecionado = st.number_input(
                 "Ajuste manual do número de clusters (opcional)",
@@ -108,13 +144,13 @@ if aba == "🏗️ Análise ML":
                 step=1
             )
 
+            # 🚀 Clusterização
             kmeans = KMeans(n_clusters=k_selecionado, random_state=42, n_init=10)
             clusters = kmeans.fit_predict(X_scaled)
             df['Cluster'] = clusters
 
-            # 📊 Visualização dos clusters (via PCA para 2D)
+            # 📊 PCA para visualização
             st.subheader("📊 Visualização dos Clusters")
-
             pca = PCA(n_components=2)
             components = pca.fit_transform(X_scaled)
             df_plot = pd.DataFrame(components, columns=['Componente 1', 'Componente 2'])
@@ -131,7 +167,7 @@ if aba == "🏗️ Análise ML":
             )
             st.plotly_chart(fig, use_container_width=True)
 
-            # 🛠️ Importância Real das Features com Random Forest
+            # 🔥 Importância Real das Features com Random Forest
             st.subheader("🛠️ Importância Real das Features")
 
             rf = RandomForestClassifier(random_state=42)
@@ -174,6 +210,7 @@ if aba == "🏗️ Análise ML":
                 file_name="base_red_flag_aba1.csv",
                 mime='text/csv'
             )
+
 # --------------------------
 # Aba 2 - Agente GPT-4o com IA Real Robusto
 # --------------------------
