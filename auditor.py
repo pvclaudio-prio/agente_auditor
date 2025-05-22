@@ -305,7 +305,7 @@ elif aba == "🤖 Agente IA":
         )
 
     with col2:
-        fornecedores_unicos = sorted(df_base["Fornecedor"].dropna().unique().tolist()) if "Fornecedor" in df_base.columns else []
+        fornecedores_unicos = ["Todos"] + sorted(df_base["Fornecedor"].dropna().unique().tolist()) if "Fornecedor" in df_base.columns else []
         filtro_fornecedor = st.selectbox(
             "Fornecedor",
             fornecedores_unicos
@@ -329,8 +329,8 @@ elif aba == "🤖 Agente IA":
     if filtro_redflag != "Todos":
         df_filtrado = df_filtrado[df_filtrado['Red Flag'] == filtro_redflag]
 
-    if filtro_fornecedor:
-        df_filtrado = df_filtrado[df_filtrado['Fornecedor'].isin(filtro_fornecedor)]
+    if filtro_fornecedor != "Todos":
+        df_filtrado = df_filtrado[df_filtrado['Fornecedor'] == filtro_fornecedor]
 
     if filtro_periodo:
         data_inicio, data_fim = filtro_periodo
