@@ -70,47 +70,103 @@ if aba == "🏗️ Análise ML":
             )
 
 # --------------------------
-# Aba 2 - Agente GPT-4o
+# Aba 2 - Agente GPT-4o (Com Filtros e Estimativa de Custo)
 # --------------------------
 elif aba == "🤖 Agente IA":
     st.header("🤖 Agente de IA - Revisão dos Red Flags")
 
-    st.subheader("📤 Upload dos arquivos necessários")
-    file_base_redflag = st.file_uploader("Base com Red Flag da Aba 1", type=["csv"], key="base1")
-    file_base_original = st.file_uploader("Base de Pagamentos Original (SAP)", type=["xlsx"], key="base2")
+    if 'df_redflag' not in st.session_state:
+        st.warning("⚠️ A base de Red Flags ainda não foi gerada. Por favor, execute a Aba 1 antes de usar esta aba.")
+        st.stop()
 
-    if file_base_redflag and file_base_original:
-        df_redflag = pd.read_csv(file_base_redflag)
-        df_original = pd.read_excel(file_base_original)
+    df_base = st.session_state['df_redflag'].copy()
 
-        st.subheader("📄 Pré-visualização das bases")
-        st.write("🔸 Base com Red Flags")
-        st.dataframe(df_redflag.head())
+    st.subheader("📄 Base com Red Flags (Aba 1)")
+    st.dataframe(df_base.head())
 
-        st.write("🔸 Base Original")
-        st.dataframe(df_original.head())
+    # 🔍 Filtros
+    st.subheader("🔎 Filtros para execução do agente")
 
-        st.subheader("🚀 Execução do Agente GPT-4o")
+    col1, col2, col3 = st.columns(3)
 
-        if st.button("🔍 Rodar Agente IA"):
-            # 🧠 Placeholder do Agente GPT
-            st.info("🔧 O agente está analisando os dados... (Simulação)")
+    with col1:
+        filtro_redflag = st.selectbox(
+            "Red Flag",
+            ["Todos", "Sim", "Não"]
+        )
 
-            df_final = df_original.copy()
+    with col2:
+        fornecedores_unicos = sorted(df_base["Fornecedor"].dropna().unique().tolist()) if "Fornecedor" in df_base.columns else []
+        filtro_fornecedor = st.multiselect(
+            "Fornecedor",
+            fornecedores_unicos,
+            default=fornecedores_unicos  # Default seleciona todos
+        )
 
-            # Simular geração de Red Flag Revisado e Motivo
-            df_final['Red Flag'] = df_redflag.get('Red Flag', np.random.choice(['Sim', 'Não'], size=len(df_final)))
-            df_final['Red Flag Revisado'] = np.random.choice(['Sim', 'Não'], size=len(df_final))
-            df_final['Motivo'] = np.where(
-                df_final['Red Flag Revisado'] == 'Sim',
-                'Valor fora do padrão esperado.',
-                'Sem inconsistências encontradas.'
+    with col3:
+        if "Data" in df_base.columns:
+            df_base["Data"] = pd.to_datetime(df_base["Data"], errors='coerce')
+            data_min = df_base["Data"].min().date()
+            data_max = df_base["Data"].max().date()
+            filtro_periodo = st.date_input(
+                "Período:",
+                [data_min, data_max]
             )
+        else:
+            filtro_periodo = None
 
-            st.success("✅ Análise concluída.")
-            st.dataframe(df_final.head())
+    # Aplicar filtros
+    df_filtrado = df_base.copy()
 
-            st.session_state['df_final'] = df_final  # Salvar para a aba de download
+    if filtro_redflag != "Todos":
+        df_filtrado = df_filtrado[df_filtrado['Red Flag'] == filtro_redflag]
+
+    if filtro_fornecedor:
+        df_filtrado = df_filtrado[df_filtrado['Fornecedor'].isin(filtro_fornecedor)]
+
+    if filtro_periodo:
+        data_inicio, data_fim = filtro_periodo
+        df_filtrado = df_filtrado[
+            (df_filtrado["Data"].dt.date >= data_inicio) &
+            (df_filtrado["Data"].dt.date <= data_fim)
+        ]
+
+    st.markdown(f"🔸 **{len(df_filtrado)} registros encontrados após aplicação dos filtros.**")
+    st.dataframe(df_filtrado.head())
+
+    # 💰 Estimativa de Custo
+    st.subheader("💰 Estimativa de Custo")
+
+    tokens_estimados_por_linha = 150  # Aproximação média
+    custo_por_1000_tokens = 0.01  # Custo aproximado GPT-4o (ajustar conforme seu plano)
+
+    total_tokens = len(df_filtrado) * tokens_estimados_por_linha
+    custo_estimado = (total_tokens / 1000) * custo_por_1000_tokens
+
+    st.info(f"🔢 Tokens estimados: {total_tokens} tokens")
+    st.info(f"💰 Custo estimado: **USD {custo_estimado:.4f}** (baseado em {len(df_filtrado)} registros)")
+
+    # 🚀 Botão de Execução
+    executar = st.button(f"🚀 Executar Agente GPT-4o para {len(df_filtrado)} registros")
+
+    if executar:
+        st.info("🔧 O agente está analisando os dados... (Simulação)")
+
+        df_final = df_filtrado.copy()
+
+        # 🔥 Simulação da análise do agente
+        df_final['Red Flag Revisado'] = np.random.choice(['Sim', 'Não'], size=len(df_final))
+        df_final['Motivo'] = np.where(
+            df_final['Red Flag Revisado'] == 'Sim',
+            'Pagamento fora do padrão esperado, verificado por IA.',
+            'Sem inconsistências relevantes encontradas.'
+        )
+
+        st.success("✅ Análise do agente concluída.")
+        st.dataframe(df_final.head())
+
+        # Salvar para download na Aba 3
+        st.session_state['df_final'] = df_final
 
 # --------------------------
 # Aba 3 - Download Final
