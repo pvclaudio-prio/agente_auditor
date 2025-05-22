@@ -28,6 +28,66 @@ st.markdown("Aplicativo para clusterização, detecção de red flags e revisão
 # Configurar chave da OpenAI
 openai.api_key = st.secrets["openai"]["api_key"]
 
+def preprocessar_base(df: pd.DataFrame):
+    """
+    🔧 Função robusta de pré-processamento:
+    - Limpa nomes de colunas
+    - Remove espaços, quebras e caracteres invisíveis
+    - Converte possíveis colunas numéricas armazenadas como texto
+    - Remove colunas 100% nulas
+    - Remove linhas totalmente vazias
+    - Remove colunas duplicadas (se houver)
+
+    ✅ Retorna:
+    - DataFrame limpo
+    - Lista de colunas numéricas detectadas
+    """
+
+    st.subheader("🧽 Executando pré-processamento da base")
+
+    # 🔗 Limpeza dos nomes das colunas
+    df.columns = df.columns.str.strip().str.replace('\n', '').str.replace('\r', '').str.replace('\t', '')
+
+    # 🔍 Remover colunas 100% nulas
+    colunas_nulas = df.columns[df.isnull().all()].tolist()
+    if colunas_nulas:
+        st.warning(f"⚠️ As seguintes colunas foram removidas por serem 100% nulas: {colunas_nulas}")
+        df = df.drop(columns=colunas_nulas)
+
+    # 🔍 Remover linhas totalmente vazias
+    linhas_vazias = df.isnull().all(axis=1).sum()
+    if linhas_vazias > 0:
+        st.warning(f"⚠️ {linhas_vazias} linhas totalmente vazias foram removidas.")
+        df = df.dropna(how='all')
+
+    # 🔍 Remover colunas duplicadas
+    if df.columns.duplicated().any():
+        st.warning("⚠️ Foram encontradas colunas duplicadas e elas foram removidas.")
+        df = df.loc[:, ~df.columns.duplicated()]
+
+    # 🔧 Tentativa de conversão forçada para numérico
+    df_converted = df.copy()
+    for col in df.columns:
+        df_converted[col] = pd.to_numeric(df[col], errors='ignore')
+
+    # 🔍 Detectar colunas numéricas
+    colunas_numericas = df_converted.select_dtypes(include=['float64', 'int64', 'float32', 'int32']).columns.tolist()
+
+    if not colunas_numericas:
+        st.warning("⚠️ Nenhuma coluna foi detectada como numérica inicialmente. Tentando forçar a conversão...")
+
+        for col in df.columns:
+            df_converted[col] = pd.to_numeric(df[col], errors='coerce')
+
+        colunas_numericas = df_converted.select_dtypes(include=['float64', 'int64', 'float32', 'int32']).columns.tolist()
+
+    if not colunas_numericas:
+        st.error("🚫 Nenhuma coluna numérica encontrada após o pré-processamento.")
+    else:
+        st.success(f"✅ Colunas numéricas detectadas: {colunas_numericas}")
+
+    return df_converted, colunas_numericas
+
 # --------------------------
 # Definindo abas
 # --------------------------
@@ -46,7 +106,14 @@ if aba == "🏗️ Análise ML":
     uploaded_file = st.file_uploader("📤 Faça upload da base de pagamentos (Excel)", type=["xlsx"])
 
     if uploaded_file is not None:
-        df = pd.read_excel(uploaded_file, engine='openpyxl')
+        df_raw = pd.read_excel(uploaded_file, engine='openpyxl')
+    
+        # ✅ Executa o pré-processamento
+        df, colunas_numericas = preprocessar_base(df_raw)
+    
+        if not colunas_numericas:
+            st.stop()  # Interrompe execução se não houver colunas numéricas
+
         st.subheader("📄 Pré-visualização da base")
         st.dataframe(df.head())
 
