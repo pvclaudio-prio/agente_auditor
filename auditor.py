@@ -18,6 +18,7 @@ st.markdown("Aplicativo para clusterização, detecção de red flags e revisão
 # --------------------------
 # Definindo abas
 # --------------------------
+st.sidebar.image("PRIO_SEM_POLVO_PRIO_PANTONE_LOGOTIPO_Azul.png")
 aba = st.sidebar.radio(
     "Navegação",
     ["🏗️ Aba 1 - Análise Tradicional", "🤖 Aba 2 - Agente GPT-4o", "📥 Download da Base Final"]
