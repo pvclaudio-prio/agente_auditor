@@ -76,7 +76,7 @@ elif aba == "🤖 Agente IA":
     st.header("🤖 Agente de IA - Revisão dos Red Flags")
 
     if 'df_redflag' not in st.session_state:
-        st.warning("⚠️ A base de Red Flags ainda não foi gerada. Por favor, execute a Aba 1 antes de usar esta aba.")
+        st.warning("⚠️ A base de Red Flags ainda não foi gerada. Por favor, execute a Análise de ML antes de usar esta aba.")
         st.stop()
 
     df_base = st.session_state['df_redflag'].copy()
