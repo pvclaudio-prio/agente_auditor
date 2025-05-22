@@ -7,12 +7,12 @@ import plotly.express as px
 # Configurações da página
 # --------------------------
 st.set_page_config(
-    page_title="Análise de Pagamentos - SAP",
+    page_title="Análise de Pagamentos",
     page_icon="💰",
     layout="wide"
 )
 
-st.title("💰 Análise Inteligente de Pagamentos - SAP")
+st.title("💰 Análise Inteligente de Pagamentos")
 st.markdown("Aplicativo para clusterização, detecção de red flags e revisão inteligente com IA.")
 
 # --------------------------
@@ -21,13 +21,13 @@ st.markdown("Aplicativo para clusterização, detecção de red flags e revisão
 st.sidebar.image("PRIO_SEM_POLVO_PRIO_PANTONE_LOGOTIPO_Azul.png")
 aba = st.sidebar.radio(
     "Navegação",
-    ["🏗️ Aba 1 - Análise Tradicional", "🤖 Aba 2 - Agente GPT-4o", "📥 Download da Base Final"]
+    ["🏗️ Análise ML", "🤖 Agente IA", "📥 Download"]
 )
 
 # --------------------------
 # Aba 1 - Análise Tradicional
 # --------------------------
-if aba == "🏗️ Aba 1 - Análise Tradicional":
+if aba == "🏗️ Análise ML":
     st.header("🏗️ Clusterização + Classificação + Red Flag")
 
     uploaded_file = st.file_uploader("📤 Faça upload da base de pagamentos (Excel)", type=["xlsx"])
@@ -72,7 +72,7 @@ if aba == "🏗️ Aba 1 - Análise Tradicional":
 # --------------------------
 # Aba 2 - Agente GPT-4o
 # --------------------------
-elif aba == "🤖 Aba 2 - Agente GPT-4o":
+elif aba == "🤖 Agente IA":
     st.header("🤖 Agente de IA - Revisão dos Red Flags")
 
     st.subheader("📤 Upload dos arquivos necessários")
@@ -115,7 +115,7 @@ elif aba == "🤖 Aba 2 - Agente GPT-4o":
 # --------------------------
 # Aba 3 - Download Final
 # --------------------------
-elif aba == "📥 Download da Base Final":
+elif aba == "📥 Download":
     st.header("📥 Download da Base Consolidada")
 
     if 'df_final' in st.session_state:
