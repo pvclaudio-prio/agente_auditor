@@ -5,6 +5,13 @@ import plotly.express as px
 import openai
 import json
 import time
+from sklearn.cluster import KMeans
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.preprocessing import StandardScaler
+from sklearn.decomposition import PCA
+from sklearn.metrics import silhouette_score
+import matplotlib.pyplot as plt
+import seaborn as sns
 
 # --------------------------
 # Configurações da página
@@ -43,38 +50,130 @@ if aba == "🏗️ Análise ML":
         st.subheader("📄 Pré-visualização da base")
         st.dataframe(df.head())
 
-        st.subheader("🎯 Selecione as colunas para análise")
-        selected_columns = st.multiselect("Selecione as colunas numéricas para clusterização e classificação", df.columns)
+        st.subheader("🎯 Selecione as colunas numéricas para análise")
+        selected_columns = st.multiselect(
+            "Selecione as colunas para clusterização e classificação",
+            df.select_dtypes(include=['float64', 'int64']).columns.tolist()
+        )
 
         if selected_columns:
-            st.success(f"Colunas selecionadas para análise: {selected_columns}")
+            st.success(f"Colunas selecionadas: {selected_columns}")
 
-            # 🔥 Placeholder para futura clusterização
-            st.subheader("📊 Visualização dos Clusters (Em Desenvolvimento)")
+            # 🔧 Padronização dos dados
+            scaler = StandardScaler()
+            X_scaled = scaler.fit_transform(df[selected_columns])
 
-            # Placeholder para plot
-            st.info("Aqui aparecerá o gráfico de clusterização.")
+            # 🔍 Encontrar número ótimo de clusters (Elbow + Silhouette)
+            st.subheader("🔢 Avaliação Automática do Número de Clusters")
 
-            # 🔍 Placeholder para Grid Search dos pesos
-            st.subheader("🛠️ Grid Search de Pesos das Features (Em Desenvolvimento)")
+            sil_scores = []
+            inertias = []
+            k_range = range(2, 10)
 
-            st.info("Aqui será exibido um gráfico mostrando a influência de cada feature.")
+            for k in k_range:
+                kmeans = KMeans(n_clusters=k, random_state=42, n_init=10)
+                kmeans.fit(X_scaled)
+                labels = kmeans.labels_
+                sil = silhouette_score(X_scaled, labels)
+                sil_scores.append(sil)
+                inertias.append(kmeans.inertia_)
 
-            # 🏷️ Placeholder para Classificação e Red Flags
-            st.subheader("🚩 Classificação e Identificação de Red Flags (Em Desenvolvimento)")
+            # Plot Elbow e Silhouette
+            fig, ax1 = plt.subplots()
 
-            # Simular uma coluna temporária de Red Flag
-            df['Red Flag'] = np.random.choice(['Sim', 'Não'], size=len(df))
+            color = 'tab:blue'
+            ax1.set_xlabel('Número de Clusters')
+            ax1.set_ylabel('Inertia (Elbow)', color=color)
+            ax1.plot(k_range, inertias, marker='o', color=color)
+            ax1.tick_params(axis='y', labelcolor=color)
+
+            ax2 = ax1.twinx()
+
+            color = 'tab:green'
+            ax2.set_ylabel('Silhouette Score', color=color)
+            ax2.plot(k_range, sil_scores, marker='x', linestyle='--', color=color)
+            ax2.tick_params(axis='y', labelcolor=color)
+
+            st.pyplot(fig)
+
+            # Seleção automática: melhor Silhouette
+            melhor_k = k_range[sil_scores.index(max(sil_scores))]
+            st.success(f"📈 Número sugerido de clusters: **{melhor_k}** (Silhouette Score = {max(sil_scores):.4f})")
+
+            k_selecionado = st.number_input(
+                "Ajuste manual do número de clusters (opcional)",
+                min_value=2,
+                max_value=10,
+                value=melhor_k,
+                step=1
+            )
+
+            kmeans = KMeans(n_clusters=k_selecionado, random_state=42, n_init=10)
+            clusters = kmeans.fit_predict(X_scaled)
+            df['Cluster'] = clusters
+
+            # 📊 Visualização dos clusters (via PCA para 2D)
+            st.subheader("📊 Visualização dos Clusters")
+
+            pca = PCA(n_components=2)
+            components = pca.fit_transform(X_scaled)
+            df_plot = pd.DataFrame(components, columns=['Componente 1', 'Componente 2'])
+            df_plot['Cluster'] = clusters.astype(str)
+
+            fig = px.scatter(
+                df_plot,
+                x="Componente 1",
+                y="Componente 2",
+                color="Cluster",
+                title="Distribuição dos Clusters",
+                width=800,
+                height=500
+            )
+            st.plotly_chart(fig, use_container_width=True)
+
+            # 🛠️ Importância Real das Features com Random Forest
+            st.subheader("🛠️ Importância Real das Features")
+
+            rf = RandomForestClassifier(random_state=42)
+            rf.fit(X_scaled, clusters)
+
+            importances = rf.feature_importances_
+            feature_importance = pd.DataFrame({
+                'Feature': selected_columns,
+                'Importância': importances
+            }).sort_values(by="Importância", ascending=False)
+
+            fig_pesos = px.bar(
+                feature_importance,
+                x="Feature",
+                y="Importância",
+                title="Importância das Features (Random Forest)",
+                text_auto='.2f'
+            )
+            st.plotly_chart(fig_pesos, use_container_width=True)
+
+            # 🚩 Classificação para Red Flag
+            st.subheader("🚩 Classificação Supervisionada para Identificação de Red Flags")
+
+            red_flag_cluster = st.multiselect(
+                "Selecione os clusters que serão considerados como **Red Flag**",
+                options=sorted(df['Cluster'].unique().tolist()),
+                default=[max(df['Cluster'])]
+            )
+
+            df['Red Flag'] = df['Cluster'].apply(lambda x: 'Sim' if x in red_flag_cluster else 'Não')
 
             st.dataframe(df.head())
 
+            # ✔️ Salvar no session_state para a Aba 2
+            st.session_state['df_redflag'] = df
+
             st.download_button(
                 label="💾 Baixar base com Red Flags (Aba 1)",
-                data=df.to_csv(index=False).encode('utf-8-sig'),
+                data=df.to_csv(index=False, sep=";", encoding='utf-8-sig'),
                 file_name="base_red_flag_aba1.csv",
                 mime='text/csv'
             )
-
 # --------------------------
 # Aba 2 - Agente GPT-4o com IA Real Robusto
 # --------------------------
