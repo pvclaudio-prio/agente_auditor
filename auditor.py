@@ -205,6 +205,7 @@ elif menu == "🔍 Análise Exploratória":
 
     else:
         st.warning("⚠️ Você precisa primeiro carregar e tratar a base na aba '📥 Upload de Base'.")
+        
 elif menu == "🚩 Red Flags & Duplicidades":
     st.subheader("🚩 Detecção de Red Flags e Pagamentos Duplicados")
 
