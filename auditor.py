@@ -278,6 +278,7 @@ elif menu == "🤖 Machine Learning | Red Flags":
         # ==========================
 
         df['ano_mes_ordinal'] = df['ano_mes'].astype('category').cat.codes
+        meses_labels = dict(enumerate(df['ano_mes'].astype('category').cat.categories))
 
         X = df[['valor', 'ano_mes_ordinal']]
 
@@ -307,16 +308,37 @@ elif menu == "🤖 Machine Learning | Red Flags":
         # ==========================
 
         st.markdown("### 🎯 Visualização dos Clusters")
-        fig, ax = plt.subplots()
+
+        fig, ax = plt.subplots(figsize=(10, 6))
         scatter = ax.scatter(
             df['ano_mes_ordinal'],
             df['valor'],
             c=df['cluster'],
-            cmap='viridis'
+            cmap='viridis',
+            s=60,
+            alpha=0.7,
+            edgecolor='k'
         )
-        ax.set_xlabel('Ano-Mês (Ordinal)')
-        ax.set_ylabel('Valor')
-        ax.set_title('Distribuição dos Clusters')
+
+        ax.set_xlabel('Ano-Mês')
+        ax.set_ylabel('Valor (R$)')
+        ax.set_title('Distribuição dos Clusters com KMeans')
+
+        from matplotlib.lines import Line2D
+        legend_elements = [
+            Line2D([0], [0], marker='o', color='w',
+                   label=f'Cluster {i} {"(Red Flag)" if i == menor_cluster else ""}',
+                   markerfacecolor=plt.cm.viridis(i / (len(cluster_counts)-1)),
+                   markersize=8, markeredgecolor='k')
+            for i in cluster_counts.index
+        ]
+
+        ax.legend(handles=legend_elements, title="Clusters")
+        ax.grid(True)
+        ax.set_xticks(df['ano_mes_ordinal'].unique())
+        ax.set_xticklabels([meses_labels[i] for i in df['ano_mes_ordinal'].unique()], rotation=45)
+        plt.tight_layout()
+
         st.pyplot(fig)
 
         # ==========================
