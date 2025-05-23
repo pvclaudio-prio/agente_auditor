@@ -170,9 +170,9 @@ elif menu == "🔍 Análise Exploratória":
         ticket_medio = total_pago / qtd_lancamentos if qtd_lancamentos > 0 else 0
 
         col1, col2, col3 = st.columns(3)
-        col1.metric("💰 Total Pago", f"R$ {total_pago:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
+        col1.metric("💰 Total Pago", f"R$ {total_pago::.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
         col2.metric("🧾 Lançamentos", f"{qtd_lancamentos:,}")
-        col3.metric("💸 Ticket Médio", f"R$ {ticket_medio:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
+        col3.metric("💸 Ticket Médio", f"R$ {ticket_medio::.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
 
         st.markdown("---")
 
@@ -194,22 +194,6 @@ elif menu == "🔍 Análise Exploratória":
             .reset_index()
         )
         st.bar_chart(top_fornecedores.set_index('fornecedor'))
-
-        st.markdown("### 🏢 Distribuição por Centro de Custo")
-
-        df_filtro['centro_custo_nome'] = (
-            df_filtro['descricao_documento']
-            .str.extract(r'\((.*?)\)')[0]
-            .fillna('Não Informado')
-        )
-
-        dist_centro = (
-            df_filtro.groupby('centro_custo_nome')['valor']
-            .sum()
-            .sort_values(ascending=False)
-            .reset_index()
-        )
-        st.bar_chart(dist_centro.set_index('centro_custo_nome'))
 
         st.markdown("---")
         st.markdown("### 🔍 Tabela Detalhada dos Dados Filtrados")
