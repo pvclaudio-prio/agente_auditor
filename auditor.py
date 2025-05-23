@@ -271,7 +271,9 @@ elif menu == "🚩 Red Flags & Duplicidades":
 elif menu == "🤖 Machine Learning | Red Flags":
     st.subheader("🤖 Machine Learning Supervisionado | Classificação de Risco")
 
-    # Verificar se existe base tratada
+    # =========================
+    # CARREGAR BASE
+    # =========================
     if 'df_tratado' in st.session_state:
         df = st.session_state['df_tratado'].copy()
     else:
@@ -316,10 +318,6 @@ elif menu == "🤖 Machine Learning | Red Flags":
         st.warning("⚠️ A coluna 'red_flag' não foi encontrada. Como proxy, todos os registros serão considerados 'Não'.")
         df['label'] = 0
 
-    # =========================
-    # PREPARAÇÃO DOS DADOS
-    # =========================
-
     X = df[[
         'valor', 'qtd_pagamentos_fornecedor', 'valor_medio_fornecedor',
         'fornecedor_encoded', 'conta_encoded', 'centro_encoded',
@@ -327,6 +325,17 @@ elif menu == "🤖 Machine Learning | Red Flags":
     ]]
 
     y = df['label']
+
+    # =========================
+    # CHECAGEM DE CLASSES
+    # =========================
+    if y.nunique() < 2:
+        st.error("❌ O dataset possui apenas uma classe na variável alvo. Verifique a geração de Red Flags no passo anterior.")
+        st.stop()
+
+    # =========================
+    # NORMALIZAÇÃO E SPLIT
+    # =========================
 
     scaler = StandardScaler()
     X_scaled = scaler.fit_transform(X)
@@ -336,18 +345,17 @@ elif menu == "🤖 Machine Learning | Red Flags":
     )
 
     # =========================
-    # MODELO
+    # TREINAMENTO DO MODELO
     # =========================
 
     clf = RandomForestClassifier(n_estimators=100, random_state=42)
     clf.fit(X_train, y_train)
 
     # =========================
-    # AVALIAÇÃO
+    # AVALIAÇÃO DO MODELO
     # =========================
 
     y_pred = clf.predict(X_test)
-    y_proba = clf.predict_proba(X_test)[:, 1]
 
     st.subheader("📊 Avaliação do Modelo")
     st.text(classification_report(y_test, y_pred))
@@ -357,6 +365,7 @@ elif menu == "🤖 Machine Learning | Red Flags":
     # =========================
 
     df['probabilidade_redflag'] = clf.predict_proba(X_scaled)[:, 1]
+
     threshold = st.slider("Selecione o Threshold para Classificação", min_value=0.1, max_value=0.9, value=0.7)
     df['red_flag'] = df['probabilidade_redflag'].apply(lambda x: 'Sim' if x >= threshold else 'Não')
 
