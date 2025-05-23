@@ -44,10 +44,6 @@ if menu == "📥 Upload de Base":
         df = pd.read_excel(file, sheet_name="Exportação SAPUI5")
         st.success("✅ Base carregada com sucesso!")
 
-        # Visualização inicial
-        st.subheader("📄 Pré-visualização dos Dados")
-        st.dataframe(df.head(20))
-
         # ===================
         # PRÉ-PROCESSAMENTO
         # ===================
@@ -56,14 +52,14 @@ if menu == "📥 Upload de Base":
         df['Data de lançamento'] = pd.to_datetime(df['Data de lançamento'], errors='coerce')
 
         # Criação de colunas auxiliares
-        df['Ano_Mes'] = df['Data de lançamento'].dt.to_period('M').astype(str)
-        df['Valor_absoluto'] = df['Mont.moeda empresa'].abs()
+        df['ano_mes'] = df['Data de lançamento'].dt.to_period('M').astype(str)
+        df['valor'] = df['Mont.moeda empresa'].abs()
 
         # Padronizar nome do fornecedor
-        df['Nome de fornecedor'] = df['Nome de fornecedor'].astype(str).str.strip().str.upper()
+        df['fornecedor'] = df['Nome de fornecedor'].astype(str).str.strip().str.upper()
 
         # Tratar PO (Documento de compras)
-        df['PO'] = df['Documento de compras'].astype(str).replace('nan', np.nan)
+        df['numero_po'] = df['Documento de compras'].astype(str).replace('nan', np.nan)
 
         # ===================
         # LIMPEZA POR REGRAS
@@ -104,7 +100,25 @@ if menu == "📥 Upload de Base":
             "TRIBUNAL REGIONAL DO TRABALHO DA 1 REGIA"
         ]
         fornecedores_excluir = [f.strip().upper() for f in fornecedores_excluir]
-        df = df[~df['Nome de fornecedor'].isin(fornecedores_excluir)]
+        df = df[~df['fornecedor'].isin(fornecedores_excluir)]
+
+        # ===================
+        # SELEÇÃO E RENOMEAÇÃO DE COLUNAS
+        # ===================
+
+        df = df[[
+            'Empresa', 'Conta do Razão', 'Denom.longa cta.rz.',
+            'Txt.it.partida', 'Moeda da empresa', 'fornecedor',
+            'ano_mes', 'valor', 'numero_po'
+        ]]
+
+        df.rename(columns={
+            'Empresa': 'empresa',
+            'Conta do Razão': 'conta_contabil',
+            'Denom.longa cta.rz.': 'descricao_conta',
+            'Txt.it.partida': 'descricao_documento',
+            'Moeda da empresa': 'moeda'
+        }, inplace=True)
 
         # ===================
         # RESULTADO DO TRATAMENTO
