@@ -523,19 +523,25 @@ elif menu == "📊 Dashboard":
         st.markdown("---")
 
         # ========================
-        # GRÁFICO 1 — EVOLUÇÃO DOS PAGAMENTOS
+        # GRÁFICO — COMPARATIVO TOTAL x ML x IA
         # ========================
-        st.markdown("### 📈 Evolução dos Pagamentos")
-        evolucao = df_filtro.groupby('ano_mes')['valor'].sum().reset_index()
-        st.bar_chart(evolucao.set_index('ano_mes'))
-
-        # ========================
-        # GRÁFICO 2 — DISTRIBUIÇÃO DOS RED FLAGS (ML e IA)
-        # ========================
-        st.markdown("### 🚩 Distribuição dos Red Flags")
-
-        redflag_dist = df_filtro.groupby(['red_flag', 'revisao_ia']).size().reset_index(name='quantidade')
-        st.bar_chart(data=redflag_dist, x="red_flag", y="quantidade", color="revisao_ia")
+        
+        st.markdown("### 📊 Comparativo: Total vs Red Flags ML vs Red Flags IA")
+        
+        total_lancamentos = df_filtro.shape[0]
+        qtd_redflag_ml = df_filtro[df_filtro['red_flag'] == 'Sim'].shape[0]
+        qtd_redflag_ia = df_filtro[df_filtro['revisao_ia'] == 'Sim'].shape[0]
+        
+        # Montar dataframe para o gráfico
+        df_comparativo = pd.DataFrame({
+            'Categoria': ['Total de Lançamentos', 'Red Flags ML', 'Red Flags IA'],
+            'Quantidade': [total_lancamentos, qtd_redflag_ml, qtd_redflag_ia]
+        })
+        
+        st.bar_chart(
+            data=df_comparativo.set_index('Categoria'),
+            use_container_width=True
+        )
 
         # ========================
         # LISTA DE ALERTAS CRÍTICOS (ML e IA = Sim)
