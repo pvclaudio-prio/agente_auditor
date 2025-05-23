@@ -283,6 +283,14 @@ elif menu == "🤖 Machine Learning | Red Flags":
     st.markdown("Esta aba aplica um modelo supervisionado (Random Forest) para prever a probabilidade de um pagamento ser uma Red Flag, substituindo o modelo anterior de clusterização.")
 
     # =========================
+    # GERAR RED FLAG AUTOMÁTICA
+    # =========================
+
+    if 'red_flag' not in df.columns:
+        st.warning("⚠️ A coluna 'red_flag' não foi encontrada. Aplicando regra automática: valores acima de R$ 500.000 são considerados Red Flag.")
+        df['red_flag'] = df['valor'].apply(lambda x: 'Sim' if x > 500000 else 'Não')
+
+    # =========================
     # ENGENHARIA DE FEATURES
     # =========================
 
@@ -312,11 +320,18 @@ elif menu == "🤖 Machine Learning | Red Flags":
     # DEFINIÇÃO DO TARGET
     # =========================
 
-    if 'red_flag' in df.columns:
-        df['label'] = df['red_flag'].map({'Sim': 1, 'Não': 0})
-    else:
-        st.warning("⚠️ A coluna 'red_flag' não foi encontrada. Como proxy, todos os registros serão considerados 'Não'.")
-        df['label'] = 0
+    df['label'] = df['red_flag'].map({'Sim': 1, 'Não': 0})
+
+    # =========================
+    # CHECAGEM DE CLASSES
+    # =========================
+    if df['label'].nunique() < 2:
+        st.error("❌ O dataset possui apenas uma classe na variável alvo, mesmo após aplicar a regra automática. Ajuste seus dados ou a regra.")
+        st.stop()
+
+    # =========================
+    # NORMALIZAÇÃO E SPLIT
+    # =========================
 
     X = df[[
         'valor', 'qtd_pagamentos_fornecedor', 'valor_medio_fornecedor',
@@ -325,17 +340,6 @@ elif menu == "🤖 Machine Learning | Red Flags":
     ]]
 
     y = df['label']
-
-    # =========================
-    # CHECAGEM DE CLASSES
-    # =========================
-    if y.nunique() < 2:
-        st.error("❌ O dataset possui apenas uma classe na variável alvo. Verifique a geração de Red Flags no passo anterior.")
-        st.stop()
-
-    # =========================
-    # NORMALIZAÇÃO E SPLIT
-    # =========================
 
     scaler = StandardScaler()
     X_scaled = scaler.fit_transform(X)
