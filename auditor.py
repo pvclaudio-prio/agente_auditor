@@ -205,7 +205,7 @@ elif menu == "🔍 Análise Exploratória":
         top_fornecedores = (
             df_filtro.groupby('fornecedor')['valor']
             .sum()
-            .sort_values(ascending=False)
+            .sort_values(ascending=True)
             .head(top_n)
             .reset_index()
         )
