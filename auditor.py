@@ -331,10 +331,10 @@ elif menu == "🤖 Machine Learning | Red Flags":
 
     else:
         st.warning("⚠️ Você precisa primeiro carregar e tratar a base na aba '📥 Upload de Base'.")
-openai.api_key = st.secrets["openai_api_key"]
 
 elif menu == "🧠 IA | Revisão dos Red Flags":
     st.subheader("🧠 Agente de IA | Revisão dos Red Flags com GPT-4o")
+    openai.api_key = st.secrets["openai_api_key"]
 
     if 'df_ml' in st.session_state:
         df = st.session_state['df_ml'].copy()
