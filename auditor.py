@@ -23,12 +23,13 @@ st.title("💰 Análise de Pagamentos a Fornecedores")
 # MENU LATERAL
 # =========================
 
+st.sidebar.image("PRIO_SEM_POLVO_PRIO_PANTONE_LOGOTIPO_Azul.png")
+
 menu = st.sidebar.selectbox(
     "Navegação",
     ["📥 Upload de Base", "🔍 Análise Exploratória", "🚩 Red Flags & Duplicidades", "🤖 Machine Learning | Red Flags", "🧠 IA | Revisão dos Red Flags", "📊 Dashboard"]
 )
 
-st.sidebar.image("PRIO_SEM_POLVO_PRIO_PANTONE_LOGOTIPO_Azul.png")
 st.sidebar.markdown("---")
 st.sidebar.info("Desenvolvido por Claudio - PRIO 🏴‍☠️")
 
