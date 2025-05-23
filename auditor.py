@@ -269,114 +269,117 @@ elif menu == "🚩 Red Flags & Duplicidades":
         st.warning("⚠️ Você precisa primeiro carregar e tratar a base na aba '📥 Upload de Base'.")
 
 elif menu == "🤖 Machine Learning | Red Flags":
-    st.subheader("🤖 Machine Learning | Clusterização de Pagamentos")
+    st.subheader("🤖 Machine Learning Supervisionado | Classificação de Risco")
 
+    # Verificar se existe base tratada
     if 'df_tratado' in st.session_state:
         df = st.session_state['df_tratado'].copy()
-
-        st.markdown("Esta aba aplica um modelo supervisionado (Random Forest) para prever a probabilidade de um pagamento ser uma Red Flag.")
-
-        # =========================
-        # ENGENHARIA DE FEATURES
-        # =========================
-
-        st.markdown("#### 🔧 Preparando dados...")
-
-        qtd_pagamentos = df.groupby('fornecedor').size().to_dict()
-        valor_medio = df.groupby('fornecedor')['valor'].mean().to_dict()
-
-        df['qtd_pagamentos_fornecedor'] = df['fornecedor'].map(qtd_pagamentos)
-        df['valor_medio_fornecedor'] = df['fornecedor'].map(valor_medio)
-
-        df['centro_custo_nome'] = (
-            df['descricao_documento']
-            .str.extract(r'\((.*?)\)')[0]
-            .fillna('Não Informado')
-        )
-
-        le_fornecedor = LabelEncoder()
-        le_conta = LabelEncoder()
-        le_centro = LabelEncoder()
-
-        df['fornecedor_encoded'] = le_fornecedor.fit_transform(df['fornecedor'])
-        df['conta_encoded'] = le_conta.fit_transform(df['conta_contabil'])
-        df['centro_encoded'] = le_centro.fit_transform(df['centro_custo_nome'])
-
-        df['ano_mes_ordinal'] = df['ano_mes'].astype('category').cat.codes
-
-        # =========================
-        # DEFINIÇÃO DO TARGET
-        # =========================
-
-        df['label'] = df['red_flag'].map({'Sim': 1, 'Não': 0})
-
-        # =========================
-        # PREPARAÇÃO DOS DADOS
-        # =========================
-
-        X = df[[
-            'valor', 'qtd_pagamentos_fornecedor', 'valor_medio_fornecedor',
-            'fornecedor_encoded', 'conta_encoded', 'centro_encoded',
-            'ano_mes_ordinal'
-        ]]
-
-        y = df['label']
-
-        scaler = StandardScaler()
-        X_scaled = scaler.fit_transform(X)
-
-        X_train, X_test, y_train, y_test = train_test_split(
-            X_scaled, y, test_size=0.2, random_state=42, stratify=y
-        )
-
-        # =========================
-        # MODELO
-        # =========================
-
-        clf = RandomForestClassifier(n_estimators=100, random_state=42)
-        clf.fit(X_train, y_train)
-
-        # =========================
-        # AVALIAÇÃO
-        # =========================
-
-        y_pred = clf.predict(X_test)
-        y_proba = clf.predict_proba(X_test)[:, 1]
-
-        st.subheader("📊 Avaliação do Modelo")
-        st.text(classification_report(y_test, y_pred))
-
-        # =========================
-        # APLICAÇÃO NA BASE COMPLETA
-        # =========================
-
-        df['probabilidade_redflag'] = clf.predict_proba(X_scaled)[:, 1]
-        threshold = st.slider("Selecione o Threshold para Classificação", min_value=0.1, max_value=0.9, value=0.7)
-        df['flag_final'] = df['probabilidade_redflag'].apply(lambda x: 'Sim' if x >= threshold else 'Não')
-
-        st.subheader("🚦 Resultado do Modelo de Classificação")
-        st.dataframe(df[[
-            'fornecedor', 'valor', 'ano_mes', 'probabilidade_redflag', 'flag_final'
-        ]])
-
-        st.session_state['df_classificacao'] = df
-
-        # =========================
-        # DOWNLOAD DO RESULTADO
-        # =========================
-
-        csv = df.to_csv(index=False).encode('utf-8-sig')
-
-        st.download_button(
-            label="📥 Baixar Resultado da Classificação em CSV",
-            data=csv,
-            file_name='resultado_classificacao.csv',
-            mime='text/csv'
-        )
-
     else:
         st.warning("⚠️ Você precisa executar primeiro a aba '📥 Upload de Base'.")
+        st.stop()
 
+    st.markdown("Esta aba aplica um modelo supervisionado (Random Forest) para prever a probabilidade de um pagamento ser uma Red Flag, substituindo o modelo anterior de clusterização.")
+
+    # =========================
+    # ENGENHARIA DE FEATURES
+    # =========================
+
+    qtd_pagamentos = df.groupby('fornecedor').size().to_dict()
+    valor_medio = df.groupby('fornecedor')['valor'].mean().to_dict()
+
+    df['qtd_pagamentos_fornecedor'] = df['fornecedor'].map(qtd_pagamentos)
+    df['valor_medio_fornecedor'] = df['fornecedor'].map(valor_medio)
+
+    df['centro_custo_nome'] = (
+        df['descricao_documento']
+        .str.extract(r'\((.*?)\)')[0]
+        .fillna('Não Informado')
+    )
+
+    le_fornecedor = LabelEncoder()
+    le_conta = LabelEncoder()
+    le_centro = LabelEncoder()
+
+    df['fornecedor_encoded'] = le_fornecedor.fit_transform(df['fornecedor'])
+    df['conta_encoded'] = le_conta.fit_transform(df['conta_contabil'])
+    df['centro_encoded'] = le_centro.fit_transform(df['centro_custo_nome'])
+
+    df['ano_mes_ordinal'] = df['ano_mes'].astype('category').cat.codes
+
+    # =========================
+    # DEFINIÇÃO DO TARGET
+    # =========================
+
+    if 'red_flag' in df.columns:
+        df['label'] = df['red_flag'].map({'Sim': 1, 'Não': 0})
+    else:
+        st.warning("⚠️ A coluna 'red_flag' não foi encontrada. Como proxy, todos os registros serão considerados 'Não'.")
+        df['label'] = 0
+
+    # =========================
+    # PREPARAÇÃO DOS DADOS
+    # =========================
+
+    X = df[[
+        'valor', 'qtd_pagamentos_fornecedor', 'valor_medio_fornecedor',
+        'fornecedor_encoded', 'conta_encoded', 'centro_encoded',
+        'ano_mes_ordinal'
+    ]]
+
+    y = df['label']
+
+    scaler = StandardScaler()
+    X_scaled = scaler.fit_transform(X)
+
+    X_train, X_test, y_train, y_test = train_test_split(
+        X_scaled, y, test_size=0.2, random_state=42, stratify=y
+    )
+
+    # =========================
+    # MODELO
+    # =========================
+
+    clf = RandomForestClassifier(n_estimators=100, random_state=42)
+    clf.fit(X_train, y_train)
+
+    # =========================
+    # AVALIAÇÃO
+    # =========================
+
+    y_pred = clf.predict(X_test)
+    y_proba = clf.predict_proba(X_test)[:, 1]
+
+    st.subheader("📊 Avaliação do Modelo")
+    st.text(classification_report(y_test, y_pred))
+
+    # =========================
+    # APLICAÇÃO NA BASE COMPLETA
+    # =========================
+
+    df['probabilidade_redflag'] = clf.predict_proba(X_scaled)[:, 1]
+    threshold = st.slider("Selecione o Threshold para Classificação", min_value=0.1, max_value=0.9, value=0.7)
+    df['red_flag'] = df['probabilidade_redflag'].apply(lambda x: 'Sim' if x >= threshold else 'Não')
+
+    st.subheader("🚦 Resultado do Modelo de Classificação")
+    st.dataframe(df[[
+        'fornecedor', 'valor', 'ano_mes', 'probabilidade_redflag', 'red_flag'
+    ]])
+
+    st.session_state['df_ml'] = df
+
+    # =========================
+    # DOWNLOAD DO RESULTADO
+    # =========================
+
+    csv = df.to_csv(index=False).encode('utf-8-sig')
+
+    st.download_button(
+        label="📥 Baixar Resultado da Classificação em CSV",
+        data=csv,
+        file_name='resultado_classificacao.csv',
+        mime='text/csv'
+    )
+    
 elif menu == "🧠 IA | Revisão dos Red Flags":
     client = openai.OpenAI(api_key=st.secrets["openai"]["api_key"])
 
