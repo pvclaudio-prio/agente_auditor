@@ -355,8 +355,9 @@ elif menu == "🤖 Machine Learning | Red Flags":
         st.warning("⚠️ Você precisa primeiro carregar e tratar a base na aba '📥 Upload de Base'.")
 
 elif menu == "🧠 IA | Revisão dos Red Flags":
+    client = openai.OpenAI(api_key=st.secrets["openai"]["api_key"])
+
     st.subheader("🧠 Agente de IA | Revisão dos Red Flags com GPT-4o")
-    openai.api_key = st.secrets["openai"]["api_key"]
 
     if 'df_ml' in st.session_state:
         df = st.session_state['df_ml'].copy()
@@ -382,16 +383,16 @@ O modelo de ML sinalizou como '{row['red_flag']}'. Você concorda? Responda 'Sim
 """
 
             try:
-                response = openai.ChatCompletion.create(
+                response = client.chat.completions.create(
                     model="gpt-4o",
                     messages=[
                         {"role": "user", "content": prompt}
                     ],
                     temperature=0.1,
-                    max_tokens=300
+                    max_tokens=500
                 )
 
-                resposta = response['choices'][0]['message']['content'].strip()
+                resposta = response.choices[0].message.content.strip()
 
                 if resposta.lower().startswith('sim'):
                     df.at[idx, 'revisao_ia'] = 'Sim'
@@ -400,8 +401,12 @@ O modelo de ML sinalizou como '{row['red_flag']}'. Você concorda? Responda 'Sim
                 else:
                     df.at[idx, 'revisao_ia'] = 'Não Informado'
 
-                # Extrair motivo após "porque"/"motivo"/"explicação"
-                motivo = resposta.split(':')[-1].strip()
+                # Extrair motivo após dois pontos ou a palavra "porque"
+                if ':' in resposta:
+                    motivo = resposta.split(':', 1)[1].strip()
+                else:
+                    motivo = resposta.strip()
+
                 df.at[idx, 'motivo_revisao'] = motivo
 
             except Exception as e:
