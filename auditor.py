@@ -354,8 +354,6 @@ elif menu == "🤖 Machine Learning | Red Flags":
     else:
         st.warning("⚠️ Você precisa primeiro carregar e tratar a base na aba '📥 Upload de Base'.")
 
-import openai
-
 elif menu == "🧠 IA | Revisão dos Red Flags":
     client = openai.OpenAI(api_key=st.secrets["openai"]["api_key"])
 
