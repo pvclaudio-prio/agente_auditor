@@ -38,7 +38,7 @@ st.sidebar.info("Desenvolvido por Claudio - PRIO 🏴‍☠️")
 if menu == "📥 Upload de Base":
     st.subheader("📥 Upload da Base de Dados - SAP")
 
-    file = st.file_uploader("Selecione o arquivo Excel extraído do SAPUI5", type=["xlsx"])
+    file = st.file_uploader("Suba a base de pagamentos", type=["xlsx"])
 
     if file is not None:
         df = pd.read_excel(file, sheet_name="Exportação SAPUI5")
