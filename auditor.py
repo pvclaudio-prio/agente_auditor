@@ -63,7 +63,7 @@ if menu == "📥 Upload de Base":
 
         # Colunas auxiliares
         df['ano_mes'] = df['data_lancamento'].dt.to_period('M').astype(str)
-        df['valor'] = df['Mont.moeda empresa'].abs()
+        df['valor'] = df['Mont.moeda empresa'].abs().astype(int)
 
         # Padronização de fornecedor
         df['fornecedor'] = df['fornecedor'].astype(str).str.strip().str.upper()
