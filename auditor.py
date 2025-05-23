@@ -201,3 +201,60 @@ elif menu == "🔍 Análise Exploratória":
 
     else:
         st.warning("⚠️ Você precisa primeiro carregar e tratar a base na aba '📥 Upload de Base'.")
+elif menu == "🚩 Red Flags & Duplicidades":
+    st.subheader("🚩 Detecção de Red Flags e Pagamentos Duplicados")
+
+    if 'df_tratado' in st.session_state:
+        df = st.session_state['df_tratado'].copy()
+
+        st.markdown("#### ⚙️ Critérios utilizados para duplicidade:")
+        st.markdown("""
+        - Mesmo **Fornecedor**
+        - Mesmo **Valor (sem centavos)**
+        - Mesmo **Ano-Mês**
+        - Se informado, mesmo **PO (número_po)**
+        """)
+
+        # ===================
+        # GERAÇÃO DA CHAVE DE DUPLICIDADE
+        # ===================
+
+        def gerar_chave(row):
+            if pd.notnull(row['numero_po']):
+                return f"{row['fornecedor']}|{row['valor']}|{row['ano_mes']}|{row['numero_po']}"
+            else:
+                return f"{row['fornecedor']}|{row['valor']}|{row['ano_mes']}"
+
+        df['chave_duplicidade'] = df.apply(gerar_chave, axis=1)
+
+        # ===================
+        # MARCAR DUPLICIDADES
+        # ===================
+        df['qtd_ocorrencias'] = df.groupby('chave_duplicidade')['chave_duplicidade'].transform('count')
+
+        df_duplicados = df[df['qtd_ocorrencias'] > 1].copy()
+
+        st.markdown("### 🚩 Pagamentos com Possíveis Duplicidades")
+        st.write(f"🔎 Foram encontrados **{df_duplicados['chave_duplicidade'].nunique()} grupos** de possíveis duplicidades, "
+                 f"totalizando **{df_duplicados.shape[0]} lançamentos**.")
+
+        st.dataframe(df_duplicados)
+
+        # ===================
+        # DOWNLOAD DOS RESULTADOS
+        # ===================
+        @st.cache_data
+        def convert_df_to_csv(df):
+            return df.to_csv(index=False).encode('utf-8-sig')
+
+        csv = convert_df_to_csv(df_duplicados)
+
+        st.download_button(
+            label="📥 Baixar Duplicidades em CSV",
+            data=csv,
+            file_name='duplicidades_detectadas.csv',
+            mime='text/csv'
+        )
+
+    else:
+        st.warning("⚠️ Você precisa primeiro carregar e tratar a base na aba '📥 Upload de Base'.")
