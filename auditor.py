@@ -5,6 +5,7 @@ from sklearn.cluster import KMeans
 from sklearn.preprocessing import StandardScaler
 import matplotlib.pyplot as plt
 import openai
+import time
 
 # =========================
 # CONFIGURAÇÕES INICIAIS
@@ -17,7 +18,6 @@ st.set_page_config(
 )
 
 st.title("💰 Análise de Pagamentos a Fornecedores")
-st.markdown("### Sistema de Detecção de Duplicidades e Red Flags - PRIO")
 
 # =========================
 # MENU LATERAL
@@ -355,7 +355,7 @@ elif menu == "🤖 Machine Learning | Red Flags":
         st.warning("⚠️ Você precisa primeiro carregar e tratar a base na aba '📥 Upload de Base'.")
 
 elif menu == "🧠 IA | Revisão dos Red Flags":
-    client = openai.OpenAI(api_key=st.secrets["openai"]["api_key"])
+    client = openai.OpenAI(api_key=st.secrets["openai_api_key"])
 
     st.subheader("🧠 Agente de IA | Revisão dos Red Flags com GPT-4o")
 
@@ -407,11 +407,12 @@ elif menu == "🧠 IA | Revisão dos Red Flags":
         rodar_analise = st.button("🚀 Rodar Análise com IA")
 
         if rodar_analise:
-            df_filtrado['revisao_ia'] = ''
-            df_filtrado['motivo_revisao'] = ''
+            with st.spinner('🧠 Executando análise com IA, isso pode levar alguns minutos...'):
+                df_filtrado['revisao_ia'] = ''
+                df_filtrado['motivo_revisao'] = ''
 
-            for idx, row in df_filtrado.iterrows():
-                prompt = f"""
+                for idx, row in df_filtrado.iterrows():
+                    prompt = f"""
 Você é um auditor especializado em detecção de fraudes. Analise o seguinte pagamento:
 
 - Fornecedor: {row['fornecedor']}
@@ -425,36 +426,38 @@ Pergunta:
 O modelo de ML sinalizou como '{row['red_flag']}'. Você concorda? Responda 'Sim' ou 'Não' e explique o motivo de forma objetiva e precisa.
 """
 
-                try:
-                    response = client.chat.completions.create(
-                        model="gpt-4o",
-                        messages=[
-                            {"role": "user", "content": prompt}
-                        ],
-                        temperature=0.1,
-                        max_tokens=500
-                    )
+                    try:
+                        response = client.chat.completions.create(
+                            model="gpt-4o",
+                            messages=[
+                                {"role": "user", "content": prompt}
+                            ],
+                            temperature=0.1,
+                            max_tokens=500
+                        )
 
-                    resposta = response.choices[0].message.content.strip()
+                        resposta = response.choices[0].message.content.strip()
 
-                    if resposta.lower().startswith('sim'):
-                        df_filtrado.at[idx, 'revisao_ia'] = 'Sim'
-                    elif resposta.lower().startswith('não') or resposta.lower().startswith('nao'):
-                        df_filtrado.at[idx, 'revisao_ia'] = 'Não'
-                    else:
-                        df_filtrado.at[idx, 'revisao_ia'] = 'Não Informado'
+                        if resposta.lower().startswith('sim'):
+                            df_filtrado.at[idx, 'revisao_ia'] = 'Sim'
+                        elif resposta.lower().startswith('não') or resposta.lower().startswith('nao'):
+                            df_filtrado.at[idx, 'revisao_ia'] = 'Não'
+                        else:
+                            df_filtrado.at[idx, 'revisao_ia'] = 'Não Informado'
 
-                    if ':' in resposta:
-                        motivo = resposta.split(':', 1)[1].strip()
-                    else:
-                        motivo = resposta.strip()
+                        if ':' in resposta:
+                            motivo = resposta.split(':', 1)[1].strip()
+                        else:
+                            motivo = resposta.strip()
 
-                    df_filtrado.at[idx, 'motivo_revisao'] = motivo
+                        df_filtrado.at[idx, 'motivo_revisao'] = motivo
 
-                except Exception as e:
-                    st.error(f"Erro na chamada da API: {e}")
-                    df_filtrado.at[idx, 'revisao_ia'] = 'Erro'
-                    df_filtrado.at[idx, 'motivo_revisao'] = 'Erro na API'
+                        time.sleep(0.5)  # Pequeno delay para não sobrecarregar API
+
+                    except Exception as e:
+                        st.error(f"Erro na chamada da API: {e}")
+                        df_filtrado.at[idx, 'revisao_ia'] = 'Erro'
+                        df_filtrado.at[idx, 'motivo_revisao'] = 'Erro na API'
 
             st.success("🚀 Revisão concluída!")
 
@@ -462,6 +465,19 @@ O modelo de ML sinalizou como '{row['red_flag']}'. Você concorda? Responda 'Sim
             st.dataframe(df_filtrado)
 
             st.session_state['df_revisado'] = df_filtrado
+
+            # =========================
+            # DOWNLOAD DO RESULTADO
+            # =========================
+
+            csv = df_filtrado.to_csv(index=False).encode('utf-8-sig')
+
+            st.download_button(
+                label="📥 Baixar Resultado da IA em CSV",
+                data=csv,
+                file_name='revisao_ia_pagamentos.csv',
+                mime='text/csv'
+            )
 
     else:
         st.warning("⚠️ Você precisa rodar antes a aba '🤖 Machine Learning | Red Flags'.")
