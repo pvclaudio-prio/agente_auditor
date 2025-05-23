@@ -354,6 +354,8 @@ elif menu == "🤖 Machine Learning | Red Flags":
     else:
         st.warning("⚠️ Você precisa primeiro carregar e tratar a base na aba '📥 Upload de Base'.")
 
+import openai
+
 elif menu == "🧠 IA | Revisão dos Red Flags":
     client = openai.OpenAI(api_key=st.secrets["openai"]["api_key"])
 
@@ -364,11 +366,54 @@ elif menu == "🧠 IA | Revisão dos Red Flags":
 
         st.markdown("O agente de IA revisa os pagamentos sinalizados pelo modelo de Machine Learning e fornece uma segunda opinião com justificativas precisas.")
 
-        df['revisao_ia'] = ''
-        df['motivo_revisao'] = ''
+        # =========================
+        # APLICAR FILTROS
+        # =========================
 
-        for idx, row in df.iterrows():
-            prompt = f"""
+        st.markdown("### 🔎 Filtros")
+
+        ano_mes = st.multiselect(
+            "Filtrar por Ano-Mês:",
+            sorted(df['ano_mes'].unique()),
+            default=sorted(df['ano_mes'].unique())
+        )
+
+        red_flag = st.multiselect(
+            "Filtrar por Red Flag do modelo de ML:",
+            ["Sim", "Não"],
+            default=["Sim", "Não"]
+        )
+
+        df_filtrado = df[
+            (df['ano_mes'].isin(ano_mes)) &
+            (df['red_flag'].isin(red_flag))
+        ]
+
+        st.dataframe(df_filtrado)
+
+        # =========================
+        # ESTIMATIVA DE TOKENS E CUSTO
+        # =========================
+
+        n_linhas = df_filtrado.shape[0]
+        tokens_estimados = n_linhas * 700  # Aproximadamente 700 tokens por linha
+        custo_estimado = tokens_estimados * 0.00001  # GPT-4o ~ $0.01 por 1k tokens (ajustável)
+
+        st.markdown(f"**🔢 Tokens estimados:** {tokens_estimados:,}")
+        st.markdown(f"**💲 Custo estimado:** ~ USD {custo_estimado:.4f}")
+
+        # =========================
+        # BOTÃO PARA EXECUTAR A ANÁLISE
+        # =========================
+
+        rodar_analise = st.button("🚀 Rodar Análise com IA")
+
+        if rodar_analise:
+            df_filtrado['revisao_ia'] = ''
+            df_filtrado['motivo_revisao'] = ''
+
+            for idx, row in df_filtrado.iterrows():
+                prompt = f"""
 Você é um auditor especializado em detecção de fraudes. Analise o seguinte pagamento:
 
 - Fornecedor: {row['fornecedor']}
@@ -382,44 +427,43 @@ Pergunta:
 O modelo de ML sinalizou como '{row['red_flag']}'. Você concorda? Responda 'Sim' ou 'Não' e explique o motivo de forma objetiva e precisa.
 """
 
-            try:
-                response = client.chat.completions.create(
-                    model="gpt-4o",
-                    messages=[
-                        {"role": "user", "content": prompt}
-                    ],
-                    temperature=0.1,
-                    max_tokens=500
-                )
+                try:
+                    response = client.chat.completions.create(
+                        model="gpt-4o",
+                        messages=[
+                            {"role": "user", "content": prompt}
+                        ],
+                        temperature=0.1,
+                        max_tokens=500
+                    )
 
-                resposta = response.choices[0].message.content.strip()
+                    resposta = response.choices[0].message.content.strip()
 
-                if resposta.lower().startswith('sim'):
-                    df.at[idx, 'revisao_ia'] = 'Sim'
-                elif resposta.lower().startswith('não') or resposta.lower().startswith('nao'):
-                    df.at[idx, 'revisao_ia'] = 'Não'
-                else:
-                    df.at[idx, 'revisao_ia'] = 'Não Informado'
+                    if resposta.lower().startswith('sim'):
+                        df_filtrado.at[idx, 'revisao_ia'] = 'Sim'
+                    elif resposta.lower().startswith('não') or resposta.lower().startswith('nao'):
+                        df_filtrado.at[idx, 'revisao_ia'] = 'Não'
+                    else:
+                        df_filtrado.at[idx, 'revisao_ia'] = 'Não Informado'
 
-                # Extrair motivo após dois pontos ou a palavra "porque"
-                if ':' in resposta:
-                    motivo = resposta.split(':', 1)[1].strip()
-                else:
-                    motivo = resposta.strip()
+                    if ':' in resposta:
+                        motivo = resposta.split(':', 1)[1].strip()
+                    else:
+                        motivo = resposta.strip()
 
-                df.at[idx, 'motivo_revisao'] = motivo
+                    df_filtrado.at[idx, 'motivo_revisao'] = motivo
 
-            except Exception as e:
-                st.error(f"Erro na chamada da API: {e}")
-                df.at[idx, 'revisao_ia'] = 'Erro'
-                df.at[idx, 'motivo_revisao'] = 'Erro na API'
+                except Exception as e:
+                    st.error(f"Erro na chamada da API: {e}")
+                    df_filtrado.at[idx, 'revisao_ia'] = 'Erro'
+                    df_filtrado.at[idx, 'motivo_revisao'] = 'Erro na API'
 
-        st.success("🚀 Revisão concluída!")
+            st.success("🚀 Revisão concluída!")
 
-        st.markdown("### 📜 Resultado da Revisão pela IA")
-        st.dataframe(df)
+            st.markdown("### 📜 Resultado da Revisão pela IA")
+            st.dataframe(df_filtrado)
 
-        st.session_state['df_revisado'] = df
+            st.session_state['df_revisado'] = df_filtrado
 
     else:
         st.warning("⚠️ Você precisa rodar antes a aba '🤖 Machine Learning | Red Flags'.")
