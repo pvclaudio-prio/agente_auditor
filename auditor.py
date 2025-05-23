@@ -481,3 +481,83 @@ O modelo de ML sinalizou como '{row['red_flag']}'. Você concorda? Responda 'Sim
 
     else:
         st.warning("⚠️ Você precisa rodar antes a aba '🤖 Machine Learning | Red Flags'.")
+
+elif menu == "📊 Dashboard":
+    st.subheader("📊 Dashboard Consolidado")
+
+    if 'df_revisado' in st.session_state:
+        df = st.session_state['df_revisado'].copy()
+
+        st.markdown("### 🔎 Filtros")
+
+        ano_mes = st.multiselect(
+            "Filtrar por Ano-Mês:",
+            sorted(df['ano_mes'].unique()),
+            default=sorted(df['ano_mes'].unique())
+        )
+
+        fornecedor = st.multiselect(
+            "Filtrar por Fornecedor:",
+            sorted(df['fornecedor'].unique())
+        )
+
+        # Aplicação dos filtros
+        df_filtro = df[df['ano_mes'].isin(ano_mes)]
+        if fornecedor:
+            df_filtro = df_filtro[df_filtro['fornecedor'].isin(fornecedor)]
+
+        # ========================
+        # INDICADORES PRINCIPAIS
+        # ========================
+        total_pago = df_filtro['valor'].sum()
+        qtd_lancamentos = df_filtro.shape[0]
+        qtd_redflag_ml = df_filtro[df_filtro['red_flag'] == 'Sim'].shape[0]
+        qtd_redflag_ia = df_filtro[df_filtro['revisao_ia'] == 'Sim'].shape[0]
+
+        col1, col2, col3, col4 = st.columns(4)
+        col1.metric("💰 Total Pago", f"R$ {total_pago:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
+        col2.metric("🧾 Lançamentos", f"{qtd_lancamentos:,}")
+        col3.metric("🚩 Red Flags ML", f"{qtd_redflag_ml}")
+        col4.metric("🤖 Red Flags IA", f"{qtd_redflag_ia}")
+
+        st.markdown("---")
+
+        # ========================
+        # GRÁFICO 1 — EVOLUÇÃO DOS PAGAMENTOS
+        # ========================
+        st.markdown("### 📈 Evolução dos Pagamentos")
+        evolucao = df_filtro.groupby('ano_mes')['valor'].sum().reset_index()
+        st.bar_chart(evolucao.set_index('ano_mes'))
+
+        # ========================
+        # GRÁFICO 2 — DISTRIBUIÇÃO DOS RED FLAGS (ML e IA)
+        # ========================
+        st.markdown("### 🚩 Distribuição dos Red Flags")
+
+        redflag_dist = df_filtro.groupby(['red_flag', 'revisao_ia']).size().reset_index(name='quantidade')
+        st.bar_chart(data=redflag_dist, x="red_flag", y="quantidade", color="revisao_ia")
+
+        # ========================
+        # LISTA DE ALERTAS CRÍTICOS (ML e IA = Sim)
+        # ========================
+        st.markdown("### 🔥 Alertas Críticos (ML e IA Concordam)")
+
+        df_alertas = df_filtro[
+            (df_filtro['red_flag'] == 'Sim') &
+            (df_filtro['revisao_ia'] == 'Sim')
+        ]
+
+        st.dataframe(df_alertas)
+
+        csv = df_alertas.to_csv(index=False).encode('utf-8-sig')
+
+        st.download_button(
+            label="📥 Baixar Alertas Críticos em CSV",
+            data=csv,
+            file_name='alertas_criticos.csv',
+            mime='text/csv'
+        )
+
+    else:
+        st.warning("⚠️ Você precisa executar a aba '🧠 IA | Revisão dos Red Flags' antes de visualizar o Dashboard.")
+
