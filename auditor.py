@@ -140,7 +140,7 @@ elif menu == "🔍 Análise Exploratória":
     st.subheader("🔍 Análise Exploratória da Base de Pagamentos")
 
     if 'df_tratado' in st.session_state:
-        df = st.session_state['df_tratado']
+        df = st.session_state['df_tratado'].copy()
 
         st.markdown("#### 🔎 Filtros")
 
@@ -187,31 +187,49 @@ elif menu == "🔍 Análise Exploratória":
         st.markdown("---")
 
         # ===================
-        # GRÁFICOS
+        # GRÁFICO DE EVOLUÇÃO
         # ===================
-
         st.markdown("### 📈 Evolução Temporal dos Pagamentos")
         evolucao = df_filtro.groupby('ano_mes')['valor'].sum().reset_index()
         st.bar_chart(evolucao.set_index('ano_mes'))
 
-        st.markdown("### 🏢 Top 10 Fornecedores por Valor")
+        # ===================
+        # GRÁFICO TOP FORNECEDORES
+        # ===================
+        top_n = st.slider(
+            "Selecione quantos fornecedores deseja visualizar no gráfico:",
+            min_value=1, max_value=20, value=5
+        )
+
+        st.markdown(f"### 🏢 Top {top_n} Fornecedores por Valor")
         top_fornecedores = (
             df_filtro.groupby('fornecedor')['valor']
             .sum()
             .sort_values(ascending=False)
-            .head(10)
+            .head(top_n)
             .reset_index()
         )
         st.bar_chart(top_fornecedores.set_index('fornecedor'))
 
-        st.markdown("### 📊 Distribuição por Contas Contábeis")
-        dist_conta = (
-            df_filtro.groupby('conta_contabil')['valor']
+        # ===================
+        # GRÁFICO DISTRIBUIÇÃO POR CENTRO DE CUSTO
+        # ===================
+
+        # Extração do nome dentro dos parênteses do centro de custo
+        df_filtro['centro_custo_nome'] = (
+            df_filtro['descricao_documento']
+            .str.extract(r'\((.*?)\)')[0]
+            .fillna('Não Informado')
+        )
+
+        st.markdown("### 🏢 Distribuição por Centro de Custo")
+        dist_centro = (
+            df_filtro.groupby('centro_custo_nome')['valor']
             .sum()
             .sort_values(ascending=False)
             .reset_index()
         )
-        st.bar_chart(dist_conta.set_index('conta_contabil'))
+        st.bar_chart(dist_centro.set_index('centro_custo_nome'))
 
         # ===================
         # TABELA DETALHADA
@@ -222,4 +240,3 @@ elif menu == "🔍 Análise Exploratória":
 
     else:
         st.warning("⚠️ Você precisa primeiro carregar e tratar a base na aba '📥 Upload de Base'.")
-
