@@ -1,6 +1,10 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
+from sklearn.cluster import KMeans
+from sklearn.preprocessing import StandardScaler
+import matplotlib.pyplot as plt
+import openai
 
 # =========================
 # CONFIGURAÇÕES INICIAIS
@@ -21,7 +25,7 @@ st.markdown("### Sistema de Detecção de Duplicidades e Red Flags - PRIO")
 
 menu = st.sidebar.selectbox(
     "Navegação",
-    ["📥 Upload de Base", "🔍 Análise Exploratória", "🚩 Red Flags & Duplicidades", "📊 Dashboard"]
+    ["📥 Upload de Base", "🔍 Análise Exploratória", "🚩 Red Flags & Duplicidades", "🤖 Machine Learning | Red Flags", "🧠 IA | Revisão dos Red Flags", "📊 Dashboard"]
 )
 
 st.sidebar.markdown("---")
@@ -258,3 +262,136 @@ elif menu == "🚩 Red Flags & Duplicidades":
 
     else:
         st.warning("⚠️ Você precisa primeiro carregar e tratar a base na aba '📥 Upload de Base'.")
+
+elif menu == "🤖 Machine Learning | Red Flags":
+    st.subheader("🤖 Machine Learning | Clusterização de Pagamentos")
+
+    if 'df_tratado' in st.session_state:
+        df = st.session_state['df_tratado'].copy()
+
+        st.markdown("#### ⚙️ Modelo Utilizado: KMeans Clustering")
+        st.markdown("O modelo agrupa pagamentos com base em **valor** e **tempo (ano-mês)** para identificar possíveis comportamentos atípicos.")
+
+        # ==========================
+        # ENGENHARIA DE VARIÁVEIS
+        # ==========================
+
+        df['ano_mes_ordinal'] = df['ano_mes'].astype('category').cat.codes
+
+        X = df[['valor', 'ano_mes_ordinal']]
+
+        scaler = StandardScaler()
+        X_scaled = scaler.fit_transform(X)
+
+        # ==========================
+        # TREINAMENTO DO KMEANS
+        # ==========================
+
+        num_clusters = st.slider('Número de clusters para KMeans:', min_value=2, max_value=10, value=3)
+
+        kmeans = KMeans(n_clusters=num_clusters, random_state=42, n_init=10)
+        df['cluster'] = kmeans.fit_predict(X_scaled)
+
+        # ==========================
+        # IDENTIFICAÇÃO DO CLUSTER DE RISCO (MENOR CLUSTER)
+        # ==========================
+
+        cluster_counts = df['cluster'].value_counts().sort_values()
+        menor_cluster = cluster_counts.index[0]  # Cluster com menos registros
+
+        df['red_flag'] = df['cluster'].apply(lambda x: 'Sim' if x == menor_cluster else 'Não')
+
+        # ==========================
+        # VISUALIZAÇÃO DOS CLUSTERS
+        # ==========================
+
+        st.markdown("### 🎯 Visualização dos Clusters")
+        fig, ax = plt.subplots()
+        scatter = ax.scatter(
+            df['ano_mes_ordinal'],
+            df['valor'],
+            c=df['cluster'],
+            cmap='viridis'
+        )
+        ax.set_xlabel('Ano-Mês (Ordinal)')
+        ax.set_ylabel('Valor')
+        ax.set_title('Distribuição dos Clusters')
+        st.pyplot(fig)
+
+        # ==========================
+        # VISUALIZAÇÃO DOS RESULTADOS
+        # ==========================
+
+        st.markdown("### 🚩 Resultado dos Red Flags Gerados pelo Modelo")
+        st.dataframe(df)
+
+        # Salvar para próxima aba (GPT-4o)
+        st.session_state['df_ml'] = df
+
+    else:
+        st.warning("⚠️ Você precisa primeiro carregar e tratar a base na aba '📥 Upload de Base'.")
+openai.api_key = st.secrets["openai_api_key"]
+
+elif menu == "🧠 IA | Revisão dos Red Flags":
+    st.subheader("🧠 Agente de IA | Revisão dos Red Flags com GPT-4o")
+
+    if 'df_ml' in st.session_state:
+        df = st.session_state['df_ml'].copy()
+
+        st.markdown("O agente de IA revisa os pagamentos sinalizados pelo modelo de Machine Learning e fornece uma segunda opinião com justificativas precisas.")
+
+        df['revisao_ia'] = ''
+        df['motivo_revisao'] = ''
+
+        for idx, row in df.iterrows():
+            prompt = f"""
+Você é um auditor especializado em detecção de fraudes. Analise o seguinte pagamento:
+
+- Fornecedor: {row['fornecedor']}
+- Valor: R$ {row['valor']}
+- Conta contábil: {row['conta_contabil']} - {row['descricao_conta']}
+- Descrição do documento: {row['descricao_documento']}
+- Mês de referência: {row['ano_mes']}
+- Flag de ML: {row['red_flag']}
+
+Pergunta:
+O modelo de ML sinalizou como '{row['red_flag']}'. Você concorda? Responda 'Sim' ou 'Não' e explique o motivo de forma objetiva e precisa.
+"""
+
+            try:
+                response = openai.ChatCompletion.create(
+                    model="gpt-4o",
+                    messages=[
+                        {"role": "user", "content": prompt}
+                    ],
+                    temperature=0.1,
+                    max_tokens=300
+                )
+
+                resposta = response['choices'][0]['message']['content'].strip()
+
+                if resposta.lower().startswith('sim'):
+                    df.at[idx, 'revisao_ia'] = 'Sim'
+                elif resposta.lower().startswith('não') or resposta.lower().startswith('nao'):
+                    df.at[idx, 'revisao_ia'] = 'Não'
+                else:
+                    df.at[idx, 'revisao_ia'] = 'Não Informado'
+
+                # Extrair motivo após "porque"/"motivo"/"explicação"
+                motivo = resposta.split(':')[-1].strip()
+                df.at[idx, 'motivo_revisao'] = motivo
+
+            except Exception as e:
+                st.error(f"Erro na chamada da API: {e}")
+                df.at[idx, 'revisao_ia'] = 'Erro'
+                df.at[idx, 'motivo_revisao'] = 'Erro na API'
+
+        st.success("🚀 Revisão concluída!")
+
+        st.markdown("### 📜 Resultado da Revisão pela IA")
+        st.dataframe(df)
+
+        st.session_state['df_revisado'] = df
+
+    else:
+        st.warning("⚠️ Você precisa rodar antes a aba '🤖 Machine Learning | Red Flags'.")
