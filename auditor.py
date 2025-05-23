@@ -51,7 +51,6 @@ if menu == "📥 Upload de Base":
             'Txt.it.partida indv.': 'descricao_documento',
             'Moeda da empresa': 'moeda',
             'Nome de fornecedor': 'fornecedor',
-            'Centro de custo': 'cc',
             'Documento de compras': 'numero_po'
         }, inplace=True)
 
@@ -119,7 +118,7 @@ if menu == "📥 Upload de Base":
 
         df = df[[
             'empresa', 'conta_contabil', 'descricao_conta', 'descricao_documento',
-            'moeda', 'fornecedor', 'ano_mes', 'valor', 'cc', 'numero_po'
+            'moeda', 'fornecedor', 'ano_mes', 'valor','numero_po'
         ]]
 
         # ===================
@@ -211,26 +210,6 @@ elif menu == "🔍 Análise Exploratória":
             .reset_index()
         )
         st.bar_chart(top_fornecedores.set_index('fornecedor'))
-
-        # ===================
-        # GRÁFICO DISTRIBUIÇÃO POR CENTRO DE CUSTO
-        # ===================
-
-        # Extração do nome dentro dos parênteses do centro de custo
-        df_filtro['cc'] = (
-            df_filtro['descricao_documento']
-            .str.extract(r'\((.*?)\)')[0]
-            .fillna('Não Informado')
-        )
-
-        st.markdown("### 🏢 Distribuição por Centro de Custo")
-        dist_centro = (
-            df_filtro.groupby('cc')['valor']
-            .sum()
-            .sort_values(ascending=False)
-            .reset_index()
-        )
-        st.bar_chart(dist_centro.set_index('cc'))
 
         # ===================
         # TABELA DETALHADA
