@@ -355,7 +355,7 @@ elif menu == "🤖 Machine Learning | Red Flags":
         st.warning("⚠️ Você precisa primeiro carregar e tratar a base na aba '📥 Upload de Base'.")
 
 elif menu == "🧠 IA | Revisão dos Red Flags":
-    client = openai.OpenAI(api_key=st.secrets["openai_api_key"])
+    client = openai.OpenAI(api_key=st.secrets["openai"]["api_key"])
 
     st.subheader("🧠 Agente de IA | Revisão dos Red Flags com GPT-4o")
 
