@@ -269,7 +269,7 @@ elif menu == "🚩 Red Flags & Duplicidades":
         st.warning("⚠️ Você precisa primeiro carregar e tratar a base na aba '📥 Upload de Base'.")
 
 elif menu == "🤖 Machine Learning | Red Flags":
-    st.subheader("🤖 Machine Learning Supervisionado | Classificação de Risco")
+    st.subheader("🤖 Machine Learning Supervisionado | Classificação de Risco com Balanceamento (SMOTE)")
 
     # =========================
     # CARREGAR BASE
@@ -280,15 +280,15 @@ elif menu == "🤖 Machine Learning | Red Flags":
         st.warning("⚠️ Você precisa executar primeiro a aba '📥 Upload de Base'.")
         st.stop()
 
-    st.markdown("Esta aba aplica um modelo supervisionado (Random Forest) para prever a probabilidade de um pagamento ser uma Red Flag, substituindo o modelo anterior de clusterização.")
+    st.markdown("Este modelo aplica Random Forest com técnica de balanceamento SMOTE para lidar com desbalanceamento na detecção de Red Flags.")
 
     # =========================
     # GERAR RED FLAG AUTOMÁTICA
     # =========================
 
     if 'red_flag' not in df.columns:
-        st.warning("⚠️ A coluna 'red_flag' não foi encontrada. Aplicando regra automática: valores acima de R$ 500.000 são considerados Red Flag.")
-        df['red_flag'] = df['valor'].apply(lambda x: 'Sim' if x > 500000 else 'Não')
+        st.warning("⚠️ A coluna 'red_flag' não foi encontrada. Aplicando regra automática: valores acima de R$ 100.000 são considerados Red Flag.")
+        df['red_flag'] = df['valor'].apply(lambda x: 'Sim' if x > 100000 else 'Não')
 
     # =========================
     # ENGENHARIA DE FEATURES
@@ -322,15 +322,12 @@ elif menu == "🤖 Machine Learning | Red Flags":
 
     df['label'] = df['red_flag'].map({'Sim': 1, 'Não': 0})
 
-    # =========================
-    # CHECAGEM DE CLASSES
-    # =========================
     if df['label'].nunique() < 2:
         st.error("❌ O dataset possui apenas uma classe na variável alvo, mesmo após aplicar a regra automática. Ajuste seus dados ou a regra.")
         st.stop()
 
     # =========================
-    # NORMALIZAÇÃO E SPLIT
+    # NORMALIZAÇÃO E SMOTE
     # =========================
 
     X = df[[
@@ -344,13 +341,16 @@ elif menu == "🤖 Machine Learning | Red Flags":
     scaler = StandardScaler()
     X_scaled = scaler.fit_transform(X)
 
-    X_train, X_test, y_train, y_test = train_test_split(
-        X_scaled, y, test_size=0.2, random_state=42, stratify=y
-    )
+    sm = SMOTE(random_state=42)
+    X_res, y_res = sm.fit_resample(X_scaled, y)
 
     # =========================
     # TREINAMENTO DO MODELO
     # =========================
+
+    X_train, X_test, y_train, y_test = train_test_split(
+        X_res, y_res, test_size=0.2, random_state=42, stratify=y_res
+    )
 
     clf = RandomForestClassifier(n_estimators=100, random_state=42)
     clf.fit(X_train, y_train)
@@ -361,7 +361,7 @@ elif menu == "🤖 Machine Learning | Red Flags":
 
     y_pred = clf.predict(X_test)
 
-    st.subheader("📊 Avaliação do Modelo")
+    st.subheader("📊 Avaliação do Modelo (Após Balanceamento)")
     st.text(classification_report(y_test, y_pred))
 
     # =========================
