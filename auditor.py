@@ -41,14 +41,14 @@ if menu == "📥 Upload de Base":
         st.success("✅ Base carregada com sucesso!")
 
         # ===================
-        # RENOMEAÇÃO INICIAL
+        # RENOMEAÇÃO DE COLUNAS
         # ===================
 
         df.rename(columns={
             'Empresa': 'empresa',
             'Conta do Razão': 'conta_contabil',
             'Denom.longa cta.rz.': 'descricao_conta',
-            'Txt.it.partida': 'descricao_documento',
+            'Txt.it.partida indv.': 'descricao_documento',
             'Moeda da empresa': 'moeda',
             'Nome de fornecedor': 'fornecedor',
             'Documento de compras': 'numero_po'
@@ -113,7 +113,7 @@ if menu == "📥 Upload de Base":
         df = df[~df['fornecedor'].isin(fornecedores_excluir)]
 
         # ===================
-        # SELEÇÃO DE COLUNAS
+        # SELEÇÃO FINAL DE COLUNAS
         # ===================
 
         df = df[[
