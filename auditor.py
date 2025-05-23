@@ -207,7 +207,6 @@ elif menu == "🔍 Análise Exploratória":
         st.warning("⚠️ Você precisa primeiro carregar e tratar a base na aba '📥 Upload de Base'.")
         
 elif menu == "🚩 Red Flags & Duplicidades":
-    st.subheader("🚩 Detecção de Red Flags e Pagamentos Duplicados")
 
     if 'df_tratado' in st.session_state:
         df = st.session_state['df_tratado'].copy()
