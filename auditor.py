@@ -135,3 +135,91 @@ if menu == "📥 Upload de Base":
 
     else:
         st.warning("⚠️ Faça o upload do arquivo Excel para prosseguir.")
+
+elif menu == "🔍 Análise Exploratória":
+    st.subheader("🔍 Análise Exploratória da Base de Pagamentos")
+
+    if 'df_tratado' in st.session_state:
+        df = st.session_state['df_tratado']
+
+        st.markdown("#### 🔎 Filtros")
+
+        # Filtros dinâmicos
+        ano_mes = st.multiselect(
+            "Filtrar por Ano-Mês:",
+            sorted(df['ano_mes'].unique()),
+            default=sorted(df['ano_mes'].unique())
+        )
+
+        conta_contabil = st.multiselect(
+            "Filtrar por Conta Contábil:",
+            sorted(df['conta_contabil'].unique()),
+            default=sorted(df['conta_contabil'].unique())
+        )
+
+        fornecedor = st.multiselect(
+            "Filtrar por Fornecedor:",
+            sorted(df['fornecedor'].unique())
+        )
+
+        # Aplicação dos filtros
+        df_filtro = df[
+            (df['ano_mes'].isin(ano_mes)) &
+            (df['conta_contabil'].isin(conta_contabil))
+        ]
+        if fornecedor:
+            df_filtro = df_filtro[df_filtro['fornecedor'].isin(fornecedor)]
+
+        st.markdown("---")
+
+        # ===================
+        # INDICADORES CHAVE
+        # ===================
+        total_pago = df_filtro['valor'].sum()
+        qtd_lancamentos = df_filtro.shape[0]
+        ticket_medio = total_pago / qtd_lancamentos if qtd_lancamentos > 0 else 0
+
+        col1, col2, col3 = st.columns(3)
+        col1.metric("💰 Total Pago", f"R$ {total_pago:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
+        col2.metric("🧾 Lançamentos", f"{qtd_lancamentos:,}")
+        col3.metric("💸 Ticket Médio", f"R$ {ticket_medio:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
+
+        st.markdown("---")
+
+        # ===================
+        # GRÁFICOS
+        # ===================
+
+        st.markdown("### 📈 Evolução Temporal dos Pagamentos")
+        evolucao = df_filtro.groupby('ano_mes')['valor'].sum().reset_index()
+        st.bar_chart(evolucao.set_index('ano_mes'))
+
+        st.markdown("### 🏢 Top 10 Fornecedores por Valor")
+        top_fornecedores = (
+            df_filtro.groupby('fornecedor')['valor']
+            .sum()
+            .sort_values(ascending=False)
+            .head(10)
+            .reset_index()
+        )
+        st.bar_chart(top_fornecedores.set_index('fornecedor'))
+
+        st.markdown("### 📊 Distribuição por Contas Contábeis")
+        dist_conta = (
+            df_filtro.groupby('conta_contabil')['valor']
+            .sum()
+            .sort_values(ascending=False)
+            .reset_index()
+        )
+        st.bar_chart(dist_conta.set_index('conta_contabil'))
+
+        # ===================
+        # TABELA DETALHADA
+        # ===================
+        st.markdown("---")
+        st.markdown("### 🔍 Tabela Detalhada dos Dados Filtrados")
+        st.dataframe(df_filtro)
+
+    else:
+        st.warning("⚠️ Você precisa primeiro carregar e tratar a base na aba '📥 Upload de Base'.")
+
