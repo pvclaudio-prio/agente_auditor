@@ -170,9 +170,9 @@ elif menu == "🔍 Análise Exploratória":
         ticket_medio = total_pago / qtd_lancamentos if qtd_lancamentos > 0 else 0
 
         col1, col2, col3 = st.columns(3)
-        col1.metric("💰 Total Pago", f"R$ {total_pago::.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
+        col1.metric("💰 Total Pago", f"R$ {total_pago:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
         col2.metric("🧾 Lançamentos", f"{qtd_lancamentos:,}")
-        col3.metric("💸 Ticket Médio", f"R$ {ticket_medio::.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
+        col3.metric("💸 Ticket Médio", f"R$ {ticket_medio:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
 
         st.markdown("---")
 
