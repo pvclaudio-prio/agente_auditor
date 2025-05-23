@@ -6,6 +6,7 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.preprocessing import LabelEncoder, StandardScaler
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import classification_report, confusion_matrix, roc_auc_score
+from imblearn.over_sampling import SMOTE
 import matplotlib.pyplot as plt
 import openai
 import time
