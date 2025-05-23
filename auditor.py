@@ -334,7 +334,7 @@ elif menu == "🤖 Machine Learning | Red Flags":
 
 elif menu == "🧠 IA | Revisão dos Red Flags":
     st.subheader("🧠 Agente de IA | Revisão dos Red Flags com GPT-4o")
-    openai.api_key = st.secrets["openai_api_key"]
+    openai.api_key = st.secrets["openai"]["api_key"]
 
     if 'df_ml' in st.session_state:
         df = st.session_state['df_ml'].copy()
