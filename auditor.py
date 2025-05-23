@@ -12,10 +12,6 @@ st.set_page_config(
     layout="wide"
 )
 
-# =========================
-# TÍTULO DA PÁGINA
-# =========================
-
 st.title("💰 Análise de Pagamentos a Fornecedores")
 st.markdown("### Sistema de Detecção de Duplicidades e Red Flags - PRIO")
 
@@ -32,43 +28,57 @@ st.sidebar.markdown("---")
 st.sidebar.info("Desenvolvido por Claudio - PRIO 🏴‍☠️")
 
 # =========================
-# UPLOAD E TRATAMENTO DA BASE
+# UPLOAD E TRATAMENTO
 # =========================
 
 if menu == "📥 Upload de Base":
     st.subheader("📥 Upload da Base de Dados - SAP")
-    
+
     file = st.file_uploader("Selecione o arquivo Excel extraído do SAPUI5", type=["xlsx"])
-    
+
     if file is not None:
         df = pd.read_excel(file, sheet_name="Exportação SAPUI5")
         st.success("✅ Base carregada com sucesso!")
+
+        # ===================
+        # RENOMEAÇÃO INICIAL
+        # ===================
+
+        df.rename(columns={
+            'Empresa': 'empresa',
+            'Conta do Razão': 'conta_contabil',
+            'Denom.longa cta.rz.': 'descricao_conta',
+            'Txt.it.partida': 'descricao_documento',
+            'Moeda da empresa': 'moeda',
+            'Nome de fornecedor': 'fornecedor',
+            'Documento de compras': 'numero_po'
+        }, inplace=True)
 
         # ===================
         # PRÉ-PROCESSAMENTO
         # ===================
 
         # Conversão de datas
-        df['Data de lançamento'] = pd.to_datetime(df['Data de lançamento'], errors='coerce')
+        df['data_lancamento'] = pd.to_datetime(df['Data de lançamento'], errors='coerce')
 
-        # Criação de colunas auxiliares
-        df['ano_mes'] = df['Data de lançamento'].dt.to_period('M').astype(str)
+        # Colunas auxiliares
+        df['ano_mes'] = df['data_lancamento'].dt.to_period('M').astype(str)
         df['valor'] = df['Mont.moeda empresa'].abs()
 
-        # Padronizar nome do fornecedor
-        df['fornecedor'] = df['Nome de fornecedor'].astype(str).str.strip().str.upper()
+        # Padronização de fornecedor
+        df['fornecedor'] = df['fornecedor'].astype(str).str.strip().str.upper()
 
-        # Tratar PO (Documento de compras)
-        df['numero_po'] = df['Documento de compras'].astype(str).replace('nan', np.nan)
+        # Tratar PO (nulo ou não)
+        df['numero_po'] = df['numero_po'].astype(str).replace('nan', np.nan)
 
         # ===================
-        # LIMPEZA POR REGRAS
+        # LIMPEZA DE DADOS
         # ===================
 
-        # 🔥 Remover linhas cuja 'Denom.longa cta.rz.' contém 'ADIANTAMENTO'
-        df = df[~df['Denom.longa cta.rz.'].str.contains('ADIANTAMENTO', na=False, case=False)]
+        # Remover linhas cuja conta contábil contém 'ADIANTAMENTO'
+        df = df[~df['descricao_conta'].str.contains('ADIANTAMENTO', na=False, case=False)]
 
-        # 🔥 Lista de fornecedores a excluir
+        # Lista de fornecedores a excluir
         fornecedores_excluir = [
             "15 OFICIO DE NOTAS DA COMARCA", "2 OFICIO DO REGISTRO DE PROTESTO", 
             "7 MINDS TRADUCOES CONSULTORIA EMPRESARIAL LTDA", "ABRASCA - ASS. BRAS. DAS CIAS ABERT",
@@ -103,25 +113,16 @@ if menu == "📥 Upload de Base":
         df = df[~df['fornecedor'].isin(fornecedores_excluir)]
 
         # ===================
-        # SELEÇÃO E RENOMEAÇÃO DE COLUNAS
+        # SELEÇÃO DE COLUNAS
         # ===================
 
         df = df[[
-            'Empresa', 'Conta do Razão', 'Denom.longa cta.rz.',
-            'Txt.it.partida', 'Moeda da empresa', 'fornecedor',
-            'ano_mes', 'valor', 'numero_po'
+            'empresa', 'conta_contabil', 'descricao_conta', 'descricao_documento',
+            'moeda', 'fornecedor', 'ano_mes', 'valor', 'numero_po'
         ]]
 
-        df.rename(columns={
-            'Empresa': 'empresa',
-            'Conta do Razão': 'conta_contabil',
-            'Denom.longa cta.rz.': 'descricao_conta',
-            'Txt.it.partida': 'descricao_documento',
-            'Moeda da empresa': 'moeda'
-        }, inplace=True)
-
         # ===================
-        # RESULTADO DO TRATAMENTO
+        # VISUALIZAÇÃO FINAL
         # ===================
 
         st.success("🚀 Dados tratados e prontos para análise!")
@@ -129,7 +130,7 @@ if menu == "📥 Upload de Base":
         st.subheader("🔧 Dados Tratados")
         st.dataframe(df.head(20))
 
-        # Salvar no session_state para as próximas etapas
+        # Salvar dataframe tratado no session_state para as próximas páginas
         st.session_state['df_tratado'] = df
 
     else:
