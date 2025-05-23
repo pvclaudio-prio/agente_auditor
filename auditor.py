@@ -2,7 +2,10 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 from sklearn.cluster import KMeans
-from sklearn.preprocessing import StandardScaler
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.preprocessing import LabelEncoder, StandardScaler
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import classification_report, confusion_matrix, roc_auc_score
 import matplotlib.pyplot as plt
 import openai
 import time
@@ -271,89 +274,108 @@ elif menu == "🤖 Machine Learning | Red Flags":
     if 'df_tratado' in st.session_state:
         df = st.session_state['df_tratado'].copy()
 
-        st.markdown("#### ⚙️ Modelo Utilizado: KMeans Clustering")
-        st.markdown("O modelo agrupa pagamentos com base em **valor** e **tempo (ano-mês)** para identificar possíveis comportamentos atípicos.")
+        st.markdown("Esta aba aplica um modelo supervisionado (Random Forest) para prever a probabilidade de um pagamento ser uma Red Flag.")
 
-        # ==========================
-        # ENGENHARIA DE VARIÁVEIS
-        # ==========================
+        # =========================
+        # ENGENHARIA DE FEATURES
+        # =========================
+
+        st.markdown("#### 🔧 Preparando dados...")
+
+        qtd_pagamentos = df.groupby('fornecedor').size().to_dict()
+        valor_medio = df.groupby('fornecedor')['valor'].mean().to_dict()
+
+        df['qtd_pagamentos_fornecedor'] = df['fornecedor'].map(qtd_pagamentos)
+        df['valor_medio_fornecedor'] = df['fornecedor'].map(valor_medio)
+
+        df['centro_custo_nome'] = (
+            df['descricao_documento']
+            .str.extract(r'\((.*?)\)')[0]
+            .fillna('Não Informado')
+        )
+
+        le_fornecedor = LabelEncoder()
+        le_conta = LabelEncoder()
+        le_centro = LabelEncoder()
+
+        df['fornecedor_encoded'] = le_fornecedor.fit_transform(df['fornecedor'])
+        df['conta_encoded'] = le_conta.fit_transform(df['conta_contabil'])
+        df['centro_encoded'] = le_centro.fit_transform(df['centro_custo_nome'])
 
         df['ano_mes_ordinal'] = df['ano_mes'].astype('category').cat.codes
-        meses_labels = dict(enumerate(df['ano_mes'].astype('category').cat.categories))
 
-        X = df[['valor', 'ano_mes_ordinal']]
+        # =========================
+        # DEFINIÇÃO DO TARGET
+        # =========================
+
+        df['label'] = df['red_flag'].map({'Sim': 1, 'Não': 0})
+
+        # =========================
+        # PREPARAÇÃO DOS DADOS
+        # =========================
+
+        X = df[[
+            'valor', 'qtd_pagamentos_fornecedor', 'valor_medio_fornecedor',
+            'fornecedor_encoded', 'conta_encoded', 'centro_encoded',
+            'ano_mes_ordinal'
+        ]]
+
+        y = df['label']
 
         scaler = StandardScaler()
         X_scaled = scaler.fit_transform(X)
 
-        # ==========================
-        # TREINAMENTO DO KMEANS
-        # ==========================
-
-        num_clusters = st.slider('Número de clusters para KMeans:', min_value=2, max_value=10, value=3)
-
-        kmeans = KMeans(n_clusters=num_clusters, random_state=42, n_init=10)
-        df['cluster'] = kmeans.fit_predict(X_scaled)
-
-        # ==========================
-        # IDENTIFICAÇÃO DO CLUSTER DE RISCO (MENOR CLUSTER)
-        # ==========================
-
-        cluster_counts = df['cluster'].value_counts().sort_values()
-        menor_cluster = cluster_counts.index[0]  # Cluster com menos registros
-
-        df['red_flag'] = df['cluster'].apply(lambda x: 'Sim' if x == menor_cluster else 'Não')
-
-        # ==========================
-        # VISUALIZAÇÃO DOS CLUSTERS
-        # ==========================
-
-        st.markdown("### 🎯 Visualização dos Clusters")
-
-        fig, ax = plt.subplots(figsize=(10, 6))
-        scatter = ax.scatter(
-            df['ano_mes_ordinal'],
-            df['valor'],
-            c=df['cluster'],
-            cmap='viridis',
-            s=60,
-            alpha=0.7,
-            edgecolor='k'
+        X_train, X_test, y_train, y_test = train_test_split(
+            X_scaled, y, test_size=0.2, random_state=42, stratify=y
         )
 
-        ax.set_xlabel('Ano-Mês')
-        ax.set_ylabel('Valor (R$)')
-        ax.set_title('Distribuição dos Clusters com KMeans')
+        # =========================
+        # MODELO
+        # =========================
 
-        from matplotlib.lines import Line2D
-        legend_elements = [
-            Line2D([0], [0], marker='o', color='w',
-                   label=f'Cluster {i} {"(Red Flag)" if i == menor_cluster else ""}',
-                   markerfacecolor=plt.cm.viridis(i / (len(cluster_counts)-1)),
-                   markersize=8, markeredgecolor='k')
-            for i in cluster_counts.index
-        ]
+        clf = RandomForestClassifier(n_estimators=100, random_state=42)
+        clf.fit(X_train, y_train)
 
-        ax.legend(handles=legend_elements, title="Clusters")
-        ax.grid(True)
-        ax.set_xticks(df['ano_mes_ordinal'].unique())
-        ax.set_xticklabels([meses_labels[i] for i in df['ano_mes_ordinal'].unique()], rotation=45)
-        plt.tight_layout()
+        # =========================
+        # AVALIAÇÃO
+        # =========================
 
-        st.pyplot(fig)
+        y_pred = clf.predict(X_test)
+        y_proba = clf.predict_proba(X_test)[:, 1]
 
-        # ==========================
-        # VISUALIZAÇÃO DOS RESULTADOS
-        # ==========================
+        st.subheader("📊 Avaliação do Modelo")
+        st.text(classification_report(y_test, y_pred))
 
-        st.markdown("### 🚩 Resultado dos Red Flags Gerados pelo Modelo")
-        st.dataframe(df)
+        # =========================
+        # APLICAÇÃO NA BASE COMPLETA
+        # =========================
 
-        # Salvar para próxima aba (GPT-4o)
-        st.session_state['df_ml'] = df
+        df['probabilidade_redflag'] = clf.predict_proba(X_scaled)[:, 1]
+        threshold = st.slider("Selecione o Threshold para Classificação", min_value=0.1, max_value=0.9, value=0.7)
+        df['flag_final'] = df['probabilidade_redflag'].apply(lambda x: 'Sim' if x >= threshold else 'Não')
+
+        st.subheader("🚦 Resultado do Modelo de Classificação")
+        st.dataframe(df[[
+            'fornecedor', 'valor', 'ano_mes', 'probabilidade_redflag', 'flag_final'
+        ]])
+
+        st.session_state['df_classificacao'] = df
+
+        # =========================
+        # DOWNLOAD DO RESULTADO
+        # =========================
+
+        csv = df.to_csv(index=False).encode('utf-8-sig')
+
+        st.download_button(
+            label="📥 Baixar Resultado da Classificação em CSV",
+            data=csv,
+            file_name='resultado_classificacao.csv',
+            mime='text/csv'
+        )
 
     else:
-        st.warning("⚠️ Você precisa primeiro carregar e tratar a base na aba '📥 Upload de Base'.")
+        st.warning("⚠️ Você precisa executar primeiro a aba '📥 Upload de Base'.")
 
 elif menu == "🧠 IA | Revisão dos Red Flags":
     client = openai.OpenAI(api_key=st.secrets["openai"]["api_key"])
