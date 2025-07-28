@@ -130,7 +130,7 @@ Relatórios exportados via `openpyxl` com formatação profissional:
 
 ## 👨‍💻 Autor
 
-**Carlos Vieira**  
+**Claudio Paiva**  
 Especialista em Auditoria
 
 ---
